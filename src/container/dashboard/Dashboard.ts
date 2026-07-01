@@ -67,6 +67,7 @@ export default defineComponent({
 
     const selectedYear = ref<number>(currentYear);
     const loading = ref(false);
+    const selectedGroup = ref<string | null>(null);
 
     // ── Raw data from API ─────────────────────────────────────────
     const kpiSettings = ref<any[]>([]);
@@ -125,7 +126,7 @@ export default defineComponent({
       loading.value = false;
     };
 
-    // ── Summary stats ─────────────────────────────────────────────
+    // ── Summary stats ─────────────────────────────────────────
     const kpiSelected = computed(() =>
       kpiSettings.value.filter((x) => x.isSelected),
     );
@@ -134,31 +135,46 @@ export default defineComponent({
       selectedYear.value === currentYear ? currentMonth : 12,
     );
 
-    const totalKpi = computed(() => kpiSelected.value.length);
+    // Filter ringkasan berdasarkan grup yang dipilih
+    const kpiSelectedFiltered = computed(() =>
+      selectedGroup.value
+        ? kpiSelected.value.filter((x) => x.groupName === selectedGroup.value)
+        : kpiSelected.value,
+    );
+
+    const achievementsFiltered = computed(() =>
+      selectedGroup.value
+        ? achievements.value.filter((a) => a.groupName === selectedGroup.value)
+        : achievements.value,
+    );
+
+    const totalKpi = computed(() => kpiSelectedFiltered.value.length);
 
     const kpiFilledThisMonth = computed(() => {
       const m = activeMonth.value;
-      return kpiSelected.value.filter((kpi) =>
-        achievements.value.some(
+      return kpiSelectedFiltered.value.filter((kpi) =>
+        achievementsFiltered.value.some(
           (a) => a.indicatorId === kpi.indicatorId && a.month === m,
         ),
       ).length;
     });
 
     const totalIndicatorsFilled = computed(() => {
-      const ids = new Set(achievements.value.map((a) => a.indicatorId));
+      const ids = new Set(achievementsFiltered.value.map((a) => a.indicatorId));
       return ids.size;
     });
 
     const avgAchievementRate = computed(() => {
       const m = activeMonth.value;
-      const kpiWithTarget = kpiSelected.value.filter((k) => k.targetValue);
+      const kpiWithTarget = kpiSelectedFiltered.value.filter(
+        (k) => k.targetValue,
+      );
       if (!kpiWithTarget.length) return null;
 
       let sum = 0;
       let count = 0;
       for (const kpi of kpiWithTarget) {
-        const ach = achievements.value.find(
+        const ach = achievementsFiltered.value.find(
           (a) => a.indicatorId === kpi.indicatorId && a.month === m,
         );
         if (ach) {
@@ -169,7 +185,9 @@ export default defineComponent({
       return count > 0 ? Math.round(sum / count) : 0;
     });
 
-    const totalAchievementsYear = computed(() => achievements.value.length);
+    const totalAchievementsYear = computed(
+      () => achievementsFiltered.value.length,
+    );
 
     // ── Helpers ───────────────────────────────────────────────────
     const fmtNum = (v: number) =>
@@ -285,6 +303,23 @@ export default defineComponent({
       }),
     );
 
+    // ── Group indicator filter ────────────────────────────────────
+    const groupOptions = computed(() => {
+      const groups = [
+        ...new Set(kpiCards.value.map((c) => c.groupName).filter(Boolean)),
+      ] as string[];
+      return [
+        { label: "Semua Grup", value: null as string | null },
+        ...groups.map((g) => ({ label: g, value: g })),
+      ];
+    });
+
+    const filteredKpiCards = computed(() =>
+      selectedGroup.value
+        ? kpiCards.value.filter((c) => c.groupName === selectedGroup.value)
+        : kpiCards.value,
+    );
+
     // ── Helpers: hitung nilai total per indikator sesuai kriteria ─
     // accumulation → ambil nilai bulan terbesar (sudah akumulatif)
     // last_month   → jumlahkan semua bulan
@@ -305,83 +340,103 @@ export default defineComponent({
     };
 
     // ── Pie Charts: Dashboard Proporsional ───────────────────────────
-    const propPieCharts = computed(() =>
-      propDashboards.value.map((dashboard) => {
-        // Bangun map achievment per indicator untuk tahun ini
-        const achieveByIndicator = new Map<number, Map<number, number>>();
-        for (const ach of achievements.value) {
-          if (!achieveByIndicator.has(ach.indicatorId)) {
-            achieveByIndicator.set(ach.indicatorId, new Map());
-          }
-          achieveByIndicator
-            .get(ach.indicatorId)!
-            .set(ach.month, Number(ach.value));
+    const propPieCharts = computed(() => {
+      // Bangun map achievement per indicator untuk tahun ini (sekali, di luar loop)
+      const achieveByIndicator = new Map<number, Map<number, number>>();
+      for (const ach of achievements.value) {
+        if (!achieveByIndicator.has(ach.indicatorId)) {
+          achieveByIndicator.set(ach.indicatorId, new Map());
         }
+        achieveByIndicator
+          .get(ach.indicatorId)!
+          .set(ach.month, Number(ach.value));
+      }
 
-        // Hitung nilai tiap item sesuai kriteria
-        const pieData = (dashboard.items as any[])
-          .map((item: any) => {
-            const monthMap =
-              achieveByIndicator.get(item.indicatorId) ??
-              new Map<number, number>();
-            const value = computeIndicatorTotal(monthMap, item.criteria);
+      // Lookup indicatorId → groupName untuk filter grup
+      const groupByIndicator = new Map<number, string>();
+      for (const ach of achievements.value) {
+        if (ach.groupName) groupByIndicator.set(ach.indicatorId, ach.groupName);
+      }
+
+      return (
+        propDashboards.value
+          .map((dashboard) => {
+            // Filter items berdasarkan grup yang dipilih
+            const items = selectedGroup.value
+              ? (dashboard.items as any[]).filter(
+                  (item) =>
+                    groupByIndicator.get(item.indicatorId) ===
+                    selectedGroup.value,
+                )
+              : (dashboard.items as any[]);
+
+            // Hitung nilai tiap item sesuai kriteria
+            const pieData = items
+              .map((item: any) => {
+                const monthMap =
+                  achieveByIndicator.get(item.indicatorId) ??
+                  new Map<number, number>();
+                const value = computeIndicatorTotal(monthMap, item.criteria);
+                return {
+                  name: item.indicatorName || `#${item.indicatorId}`,
+                  value,
+                };
+              })
+              .filter((d) => d.value > 0);
+
+            const hasData = pieData.length > 0;
+
+            const chartOption = hasData
+              ? {
+                  tooltip: {
+                    trigger: "item",
+                    formatter: (p: any) =>
+                      `${p.name}<br/>${p.marker}<b>${fmtNum(p.value)}</b> &nbsp;(${p.percent}%)`,
+                  },
+                  legend: {
+                    type: "scroll",
+                    bottom: 0,
+                    itemWidth: 12,
+                    textStyle: { fontSize: 10 },
+                  },
+                  series: [
+                    {
+                      type: "pie",
+                      radius: ["38%", "68%"],
+                      center: ["50%", "44%"],
+                      data: pieData,
+                      label: {
+                        show: true,
+                        formatter: "{b}\n{d}%",
+                        fontSize: 10,
+                        overflow: "truncate",
+                        width: 90,
+                      },
+                      labelLine: { length: 8, length2: 6 },
+                      emphasis: {
+                        itemStyle: {
+                          shadowBlur: 8,
+                          shadowColor: "rgba(0,0,0,0.15)",
+                        },
+                      },
+                    },
+                  ],
+                }
+              : null;
+
             return {
-              name: item.indicatorName || `#${item.indicatorId}`,
-              value,
+              id: dashboard.id,
+              name: dashboard.name,
+              year: dashboard.year,
+              hasData,
+              pieData,
+              chartOption,
             };
           })
-          .filter((d) => d.value > 0);
-
-        const hasData = pieData.length > 0;
-
-        const chartOption = hasData
-          ? {
-              tooltip: {
-                trigger: "item",
-                formatter: (p: any) =>
-                  `${p.name}<br/>${p.marker}<b>${fmtNum(p.value)}</b> &nbsp;(${p.percent}%)`,
-              },
-              legend: {
-                type: "scroll",
-                bottom: 0,
-                itemWidth: 12,
-                textStyle: { fontSize: 10 },
-              },
-              series: [
-                {
-                  type: "pie",
-                  radius: ["38%", "68%"],
-                  center: ["50%", "44%"],
-                  data: pieData,
-                  label: {
-                    show: true,
-                    formatter: "{b}\n{d}%",
-                    fontSize: 10,
-                    overflow: "truncate",
-                    width: 90,
-                  },
-                  labelLine: { length: 8, length2: 6 },
-                  emphasis: {
-                    itemStyle: {
-                      shadowBlur: 8,
-                      shadowColor: "rgba(0,0,0,0.15)",
-                    },
-                  },
-                },
-              ],
-            }
-          : null;
-
-        return {
-          id: dashboard.id,
-          name: dashboard.name,
-          year: dashboard.year,
-          hasData,
-          pieData,
-          chartOption,
-        };
-      }),
-    );
+          // Saat filter grup aktif, sembunyikan pie yang tidak punya data
+          .filter((pie) => !selectedGroup.value || pie.hasData)
+      );
+    });
 
     // ── Chart 2: Capaian Tahunan per Indikator (Horizontal Bar) ───
     const annualBarChartOption = computed(() => {
@@ -410,13 +465,20 @@ export default defineComponent({
           .months.set(ach.month, Number(ach.value));
       }
 
+      // Terapkan filter grup sebelum menghitung total
+      const filteredEntries = selectedGroup.value
+        ? Array.from(indicatorMap.entries()).filter(
+            ([, ind]) => ind.group === selectedGroup.value,
+          )
+        : Array.from(indicatorMap.entries());
+
+      if (!filteredEntries.length) return null;
+
       // Hitung total sesuai kriteria
-      const withTotal = Array.from(indicatorMap.entries()).map(([, ind]) => ({
+      const withTotal = filteredEntries.map(([, ind]) => ({
         ...ind,
         total: computeIndicatorTotal(ind.months, ind.criteria),
       }));
-
-      if (!indicatorMap.size) return null;
 
       const sorted = withTotal.sort((a, b) => b.total - a.total);
       const names = sorted.map((x) => x.name);
@@ -521,7 +583,13 @@ export default defineComponent({
         entry.total = computeIndicatorTotal(entry.monthMap, entry.criteria);
       }
 
-      return Array.from(indicatorMap.values()).sort(
+      // Terapkan filter grup
+      const allEntries = Array.from(indicatorMap.values());
+      const filtered = selectedGroup.value
+        ? allEntries.filter((e) => e.group === selectedGroup.value)
+        : allEntries;
+
+      return filtered.sort(
         (a, b) =>
           a.group.localeCompare(b.group) || a.name.localeCompare(b.name),
       );
@@ -623,6 +691,10 @@ export default defineComponent({
       avgAchievementRate,
       // kpi cards
       kpiCards,
+      // group filter
+      selectedGroup,
+      groupOptions,
+      filteredKpiCards,
       // pie charts proporsional
       propPieCharts,
       // annual chart

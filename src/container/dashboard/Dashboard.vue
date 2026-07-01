@@ -16,6 +16,14 @@
                     style="width: 100px"
                     @update:value="handleYearChange"
                 />
+                <n-select
+                    v-model:value="selectedGroup"
+                    :options="groupOptions"
+                    size="small"
+                    style="width: 160px"
+                    placeholder="Semua Grup"
+                    clearable
+                />
                 <n-button
                     size="small"
                     :loading="loading"
@@ -99,14 +107,24 @@
                         📉 KPI Capaian Bulanan — {{ selectedYear }}
                     </span>
                     <n-tag
-                        v-if="kpiCards.length === 0"
+                        v-if="
+                            filteredKpiCards.length === 0 &&
+                            kpiCards.length === 0
+                        "
                         type="warning"
                         size="small"
                     >
                         Belum ada KPI terpilih
                     </n-tag>
+                    <n-tag
+                        v-else-if="filteredKpiCards.length === 0"
+                        type="default"
+                        size="small"
+                    >
+                        Tidak ada KPI pada grup ini
+                    </n-tag>
                     <n-tag v-else type="default" size="small">
-                        {{ kpiCards.length }} indikator KPI
+                        {{ filteredKpiCards.length }} indikator KPI
                     </n-tag>
                 </div>
 
@@ -115,10 +133,15 @@
                     description="Belum ada KPI terpilih untuk tahun ini. Atur KPI di menu Pengaturan Finansial."
                     style="padding: 48px 0"
                 />
+                <n-empty
+                    v-else-if="filteredKpiCards.length === 0"
+                    description="Tidak ada indikator KPI pada grup yang dipilih."
+                    style="padding: 48px 0"
+                />
 
                 <div v-else class="kpi-grid">
                     <div
-                        v-for="card in kpiCards"
+                        v-for="card in filteredKpiCards"
                         :key="card.indicatorId"
                         class="kpi-card"
                     >
