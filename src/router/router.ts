@@ -5,6 +5,7 @@ import Indicator from "@/container/admin/Indicator.vue";
 import IndicatorAchievement from "@/container/admin/IndicatorAchievement.vue";
 import KpiSetting from "@/container/admin/KpiSetting.vue";
 import PropDashboard from "@/container/admin/PropDashboard.vue";
+import BarDashboard from "@/container/admin/BarDashboard.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,10 @@ const router = createRouter({
     {
       path: "/prop-dashboard",
       component: PropDashboard,
+    },
+    {
+      path: "/bar-dashboard",
+      component: BarDashboard,
     },
   ],
 });

@@ -24,6 +24,10 @@ export const LAYOUT_ITEMS = [
         key: "/prop-dashboard",
       },
       {
+        label: "Dashboard Bar",
+        key: "/bar-dashboard",
+      },
+      {
         label: "Capaian Indikator",
         key: "/indicator-achievement",
       },

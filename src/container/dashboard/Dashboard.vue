@@ -297,7 +297,55 @@
                 </div>
             </div>
 
-            <!-- ── Chart 2 : Capaian Tahunan per Indikator ────────────────── -->
+            <!-- ── Bar Charts : Dashboard Bar ───────────────────────────────────── -->
+            <div v-if="barDashboardCharts.length > 0" class="db-section-bare">
+                <div class="db-section-header mb-2">
+                    <span class="db-section-title"
+                        >📊 Dashboard Bar — {{ selectedYear }}</span
+                    >
+                    <n-tag type="default" size="small"
+                        >{{ barDashboardCharts.length }} diagram</n-tag
+                    >
+                </div>
+
+                <div class="bar-dash-grid">
+                    <n-card
+                        v-for="chart in barDashboardCharts"
+                        :key="chart.id"
+                        class="bar-dash-card"
+                        :bordered="true"
+                        size="small"
+                    >
+                        <template #header>
+                            <div class="pie-card-header">
+                                <span class="pie-card-title">{{
+                                    chart.name
+                                }}</span>
+                                <n-tag
+                                    v-if="chart.year"
+                                    size="tiny"
+                                    type="info"
+                                    >{{ chart.year }}</n-tag
+                                >
+                            </div>
+                        </template>
+
+                        <v-chart
+                            v-if="chart.hasData"
+                            class="bar-dash-chart"
+                            :option="chart.chartOption"
+                            :autoresize="true"
+                        />
+                        <n-empty
+                            v-else
+                            description="Belum ada data capaian"
+                            style="padding: 32px 0"
+                        />
+                    </n-card>
+                </div>
+            </div>
+
+            <!-- ── Chart 2 : Capaian Tahunan per Indikator ──────────────── -->
             <n-card class="db-section" :bordered="false">
                 <template #header>
                     <div class="db-section-header">
@@ -737,9 +785,31 @@
     height: 280px;
 }
 
-/* ── Annual chart ─────────────────────────────────────────── */
+/* ── Annual chart ───────────────────────────────────────────── */
 .annual-chart {
     width: 100%;
     min-height: 200px;
+}
+
+/* ── Bar Dashboard ────────────────────────────────────────── */
+.bar-dash-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 900px) {
+    .bar-dash-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.bar-dash-card {
+    border-radius: 10px;
+}
+
+.bar-dash-chart {
+    height: 260px;
+    width: 100%;
 }
 </style>

@@ -73,6 +73,7 @@ export default defineComponent({
     const kpiSettings = ref<any[]>([]);
     const achievements = ref<any[]>([]);
     const propDashboards = ref<any[]>([]);
+    const barDashboards = ref<any[]>([]);
 
     const fetchKpiSettings = async () => {
       try {
@@ -116,12 +117,27 @@ export default defineComponent({
       }
     };
 
+    const fetchBarDashboards = async () => {
+      try {
+        const res = (await apiFetch(
+          `${Config.UrlBackend}/api/fin/bar-dashboards/display?year=${selectedYear.value}`,
+          { method: "GET" },
+        )) as Response;
+        if (!res || !res.ok) return;
+        const result = await res.json();
+        barDashboards.value = result.data || [];
+      } catch {
+        /* silent */
+      }
+    };
+
     const loadAll = async () => {
       loading.value = true;
       await Promise.all([
         fetchKpiSettings(),
         fetchAchievements(),
         fetchPropDashboards(),
+        fetchBarDashboards(),
       ]);
       loading.value = false;
     };
@@ -306,7 +322,12 @@ export default defineComponent({
     // ── Group indicator filter ────────────────────────────────────
     const groupOptions = computed(() => {
       const groups = [
-        ...new Set(kpiCards.value.map((c) => c.groupName).filter(Boolean)),
+        ...new Set(
+          [
+            ...kpiCards.value.map((c) => c.groupName),
+            ...achievements.value.map((a) => a.groupName),
+          ].filter(Boolean),
+        ),
       ] as string[];
       return [
         { label: "Semua Grup", value: null as string | null },
@@ -435,6 +456,123 @@ export default defineComponent({
           })
           // Saat filter grup aktif, sembunyikan pie yang tidak punya data
           .filter((pie) => !selectedGroup.value || pie.hasData)
+      );
+    });
+
+    // ── Bar Charts: Dashboard Bar ──────────────────────────────────────
+    const barDashboardCharts = computed(() => {
+      // Bangun map achievement dan group per indicator (sekali)
+      const achieveByIndicator = new Map<number, Map<number, number>>();
+      for (const ach of achievements.value) {
+        if (!achieveByIndicator.has(ach.indicatorId)) {
+          achieveByIndicator.set(ach.indicatorId, new Map());
+        }
+        achieveByIndicator
+          .get(ach.indicatorId)!
+          .set(ach.month, Number(ach.value));
+      }
+
+      const groupByIndicator = new Map<number, string>();
+      for (const ach of achievements.value) {
+        if (ach.groupName) groupByIndicator.set(ach.indicatorId, ach.groupName);
+      }
+
+      return (
+        barDashboards.value
+          .map((dashboard) => {
+            // Filter items berdasarkan grup yang dipilih
+            const items = selectedGroup.value
+              ? (dashboard.items as any[]).filter(
+                  (item) =>
+                    groupByIndicator.get(item.indicatorId) ===
+                    selectedGroup.value,
+                )
+              : (dashboard.items as any[]);
+
+            const series = items.map((item: any) => {
+              const monthlyMap =
+                achieveByIndicator.get(item.indicatorId) ??
+                new Map<number, number>();
+              const monthlyValues = MONTHS_SHORT.map((_, i) => {
+                const v = monthlyMap.get(i + 1);
+                return v != null ? v : null;
+              });
+              return {
+                name:
+                  item.label || item.indicatorName || `#${item.indicatorId}`,
+                type: "bar",
+                data: monthlyValues,
+                barMaxWidth: 18,
+                emphasis: { itemStyle: { shadowBlur: 4 } },
+              };
+            });
+
+            const hasData = series.some((s) => s.data.some((v) => v != null));
+
+            const chartOption =
+              series.length > 0
+                ? {
+                    tooltip: {
+                      trigger: "axis",
+                      axisPointer: { type: "shadow" as const },
+                      formatter: (params: any[]) => {
+                        const month = MONTHS_LONG[params[0].dataIndex];
+                        let html = `<b>${month} ${selectedYear.value}</b><br/>`;
+                        for (const p of params) {
+                          const val =
+                            p.value != null
+                              ? Number(p.value).toLocaleString("id-ID")
+                              : "\u2014";
+                          html += `${p.marker} ${p.seriesName}: <b>${val}</b><br/>`;
+                        }
+                        return html;
+                      },
+                    },
+                    legend: {
+                      type: "scroll",
+                      bottom: 0,
+                      itemWidth: 12,
+                      textStyle: { fontSize: 10 },
+                    },
+                    grid: {
+                      top: 8,
+                      bottom: 48,
+                      left: 8,
+                      right: 8,
+                      containLabel: true,
+                    },
+                    xAxis: {
+                      type: "category",
+                      data: MONTHS_SHORT,
+                      axisLabel: { fontSize: 10 },
+                      axisTick: { show: false },
+                      axisLine: { lineStyle: { color: "#e0e0e0" } },
+                    },
+                    yAxis: {
+                      type: "value",
+                      axisLabel: {
+                        fontSize: 9,
+                        formatter: (v: number) => fmtNum(v),
+                      },
+                      splitLine: {
+                        lineStyle: { type: "dashed", color: "#f0f0f0" },
+                      },
+                    },
+                    series,
+                  }
+                : null;
+
+            return {
+              id: dashboard.id,
+              name: dashboard.name,
+              year: dashboard.year,
+              hasData,
+              itemCount: items.length,
+              chartOption,
+            };
+          })
+          // Saat filter grup aktif, sembunyikan chart yang tidak punya item
+          .filter((chart) => !selectedGroup.value || chart.itemCount > 0)
       );
     });
 
@@ -697,6 +835,8 @@ export default defineComponent({
       filteredKpiCards,
       // pie charts proporsional
       propPieCharts,
+      // bar dashboard charts
+      barDashboardCharts,
       // annual chart
       annualBarChartOption,
       hasAnnualData,
