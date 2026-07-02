@@ -4,7 +4,11 @@ export const LAYOUT_ITEMS = [
     key: "/dashboard",
   },
   {
-    label: "Master Data",
+    label: "Capaian Indikator",
+    key: "/indicator-achievement",
+  },
+  {
+    label: "Pengaturan",
     key: "/master-data",
     children: [
       {
@@ -26,10 +30,6 @@ export const LAYOUT_ITEMS = [
       {
         label: "Dashboard Bar",
         key: "/bar-dashboard",
-      },
-      {
-        label: "Capaian Indikator",
-        key: "/indicator-achievement",
       },
     ],
   },

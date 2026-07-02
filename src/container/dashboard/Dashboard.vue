@@ -3,7 +3,7 @@
         <!-- ── Header ──────────────────────────────────────────────── -->
         <div class="db-header">
             <div class="db-header-left">
-                <span class="db-title">Manajemen Dashboard</span>
+                <span class="db-title">Dashboard</span>
                 <n-tag type="info" size="small" class="db-year-tag">
                     {{ selectedYear }}
                 </n-tag>
