@@ -72,6 +72,8 @@ export default defineComponent({
     // ── Raw data from API ─────────────────────────────────────────
     const kpiSettings = ref<any[]>([]);
     const achievements = ref<any[]>([]);
+    const achievementsPrevYear = ref<any[]>([]); // N-1
+    const achievementsPrevYear2 = ref<any[]>([]); // N-2
     const propDashboards = ref<any[]>([]);
     const barDashboards = ref<any[]>([]);
 
@@ -100,6 +102,40 @@ export default defineComponent({
         achievements.value = result.data || [];
       } catch {
         /* silent */
+      }
+    };
+
+    const fetchAchievementsPrevYear = async () => {
+      try {
+        const res = (await apiFetch(
+          `${Config.UrlBackend}/api/fin/indicator-achievements?year=${selectedYear.value - 1}&pageSize=1000`,
+          { method: "GET" },
+        )) as Response;
+        if (!res || !res.ok) {
+          achievementsPrevYear.value = [];
+          return;
+        }
+        const result = await res.json();
+        achievementsPrevYear.value = result.data || [];
+      } catch {
+        achievementsPrevYear.value = [];
+      }
+    };
+
+    const fetchAchievementsPrevYear2 = async () => {
+      try {
+        const res = (await apiFetch(
+          `${Config.UrlBackend}/api/fin/indicator-achievements?year=${selectedYear.value - 2}&pageSize=1000`,
+          { method: "GET" },
+        )) as Response;
+        if (!res || !res.ok) {
+          achievementsPrevYear2.value = [];
+          return;
+        }
+        const result = await res.json();
+        achievementsPrevYear2.value = result.data || [];
+      } catch {
+        achievementsPrevYear2.value = [];
       }
     };
 
@@ -136,6 +172,8 @@ export default defineComponent({
       await Promise.all([
         fetchKpiSettings(),
         fetchAchievements(),
+        fetchAchievementsPrevYear(),
+        fetchAchievementsPrevYear2(),
         fetchPropDashboards(),
         fetchBarDashboards(),
       ]);
@@ -216,12 +254,33 @@ export default defineComponent({
     // ── Chart 1: KPI Cards — satu grafik per indikator ────────────
     const kpiCards = computed(() =>
       kpiSelected.value.map((kpi) => {
+        const prevYear = selectedYear.value - 1;
+        const prevYear2 = selectedYear.value - 2;
+
         const monthlyValues = MONTHS_SHORT.map((_, i) => {
           const ach = achievements.value.find(
             (a) => a.indicatorId === kpi.indicatorId && a.month === i + 1,
           );
           return ach != null ? Number(ach.value) : null;
         });
+
+        const prevYearValues = MONTHS_SHORT.map((_, i) => {
+          const ach = achievementsPrevYear.value.find(
+            (a) => a.indicatorId === kpi.indicatorId && a.month === i + 1,
+          );
+          return ach != null ? Number(ach.value) : null;
+        });
+
+        const prevYear2Values = MONTHS_SHORT.map((_, i) => {
+          const ach = achievementsPrevYear2.value.find(
+            (a) => a.indicatorId === kpi.indicatorId && a.month === i + 1,
+          );
+          return ach != null ? Number(ach.value) : null;
+        });
+
+        const hasPrev1Data = prevYearValues.some((v) => v != null);
+        const hasPrev2Data = prevYear2Values.some((v) => v != null);
+        const hasAnyPrev = hasPrev1Data || hasPrev2Data;
 
         const target = kpi.targetValue ? Number(kpi.targetValue) : null;
         const currentVal = monthlyValues[activeMonth.value - 1];
@@ -230,7 +289,7 @@ export default defineComponent({
             ? Math.round((currentVal / target) * 100)
             : null;
 
-        // Warna bar: tone soft/muted
+        // Warna bar tahun ini
         const barColor = (val: number | null) => {
           if (val == null) return "#e2e2e2";
           if (target == null) return "#7aadd4";
@@ -241,19 +300,48 @@ export default defineComponent({
           tooltip: {
             trigger: "axis",
             formatter: (params: any[]) => {
-              const p = params[0];
-              const month = MONTHS_LONG[p.dataIndex];
-              const val =
-                p.value != null ? Number(p.value).toLocaleString("id-ID") : "—";
-              let tip = `<b>${month} ${selectedYear.value}</b><br/>${p.marker} Capaian: <b>${val}</b>`;
+              const idx = params[0].dataIndex;
+              const month = MONTHS_LONG[idx];
+              let tip = `<b>${month}</b><br/>`;
+              for (const p of params) {
+                if (p.value == null) continue;
+                const val = Number(p.value).toLocaleString("id-ID");
+                tip += `${p.marker} ${p.seriesName}: <b>${val}</b>`;
+                if (
+                  p.seriesName === String(selectedYear.value) &&
+                  target != null
+                )
+                  tip += ` (${Math.round((Number(p.value) / target) * 100)}%)`;
+                tip += "<br/>";
+              }
               if (target != null)
-                tip += `<br/>🎯 Target: <b>${target.toLocaleString("id-ID")}</b>`;
-              if (p.value != null && target != null)
-                tip += `<br/>📈 ${Math.round((Number(p.value) / target) * 100)}%`;
+                tip += `🎯 Target: <b>${target.toLocaleString("id-ID")}</b>`;
               return tip;
             },
           },
-          grid: { top: 8, bottom: 28, left: 8, right: 8, containLabel: true },
+          legend: hasAnyPrev
+            ? {
+                data: [
+                  String(selectedYear.value),
+                  String(prevYear),
+                  String(prevYear2),
+                ],
+                selected: {
+                  [String(prevYear)]: false,
+                  [String(prevYear2)]: false,
+                },
+                top: 0,
+                itemWidth: 10,
+                textStyle: { fontSize: 9 },
+              }
+            : undefined,
+          grid: {
+            top: hasAnyPrev ? 22 : 8,
+            bottom: 28,
+            left: 8,
+            right: 8,
+            containLabel: true,
+          },
           xAxis: {
             type: "category",
             data: MONTHS_SHORT,
@@ -271,13 +359,13 @@ export default defineComponent({
           },
           series: [
             {
-              name: "Capaian",
+              name: String(selectedYear.value),
               type: "bar",
               data: monthlyValues.map((v) => ({
                 value: v,
                 itemStyle: { color: barColor(v), borderRadius: [3, 3, 0, 0] },
               })),
-              barMaxWidth: 20,
+              barMaxWidth: hasAnyPrev ? 8 : 20,
               markLine:
                 target != null
                   ? {
@@ -303,6 +391,38 @@ export default defineComponent({
                     }
                   : undefined,
             },
+            ...(hasPrev1Data
+              ? [
+                  {
+                    name: String(prevYear),
+                    type: "bar",
+                    data: prevYearValues.map((v) => ({
+                      value: v,
+                      itemStyle: {
+                        color: v != null ? "#b0c4d8" : "#e2e2e2",
+                        borderRadius: [3, 3, 0, 0],
+                      },
+                    })),
+                    barMaxWidth: 8,
+                  },
+                ]
+              : []),
+            ...(hasPrev2Data
+              ? [
+                  {
+                    name: String(prevYear2),
+                    type: "bar",
+                    data: prevYear2Values.map((v) => ({
+                      value: v,
+                      itemStyle: {
+                        color: v != null ? "#ccd9e4" : "#e2e2e2",
+                        borderRadius: [3, 3, 0, 0],
+                      },
+                    })),
+                    barMaxWidth: 8,
+                  },
+                ]
+              : []),
           ],
         };
 
@@ -460,120 +580,213 @@ export default defineComponent({
     });
 
     // ── Bar Charts: Dashboard Bar ──────────────────────────────────────
+    // Setiap diagram: indikator sebagai X-axis, YoY (tahun ini vs tahun lalu)
     const barDashboardCharts = computed(() => {
-      // Bangun map achievement dan group per indicator (sekali)
-      const achieveByIndicator = new Map<number, Map<number, number>>();
-      for (const ach of achievements.value) {
-        if (!achieveByIndicator.has(ach.indicatorId)) {
-          achieveByIndicator.set(ach.indicatorId, new Map());
-        }
-        achieveByIndicator
-          .get(ach.indicatorId)!
-          .set(ach.month, Number(ach.value));
-      }
+      const prevYear = selectedYear.value - 1;
 
       const groupByIndicator = new Map<number, string>();
       for (const ach of achievements.value) {
         if (ach.groupName) groupByIndicator.set(ach.indicatorId, ach.groupName);
       }
 
-      return (
-        barDashboards.value
-          .map((dashboard) => {
-            // Filter items berdasarkan grup yang dipilih
-            const items = selectedGroup.value
-              ? (dashboard.items as any[]).filter(
-                  (item) =>
-                    groupByIndicator.get(item.indicatorId) ===
-                    selectedGroup.value,
-                )
-              : (dashboard.items as any[]);
+      return barDashboards.value
+        .map((dashboard) => {
+          const startM = (dashboard.startMonth as number | null) ?? 1;
+          const endM = (dashboard.endMonth as number | null) ?? 12;
+          const prevYear2 = prevYear - 1; // N-2
 
-            const series = items.map((item: any) => {
-              const monthlyMap =
-                achieveByIndicator.get(item.indicatorId) ??
-                new Map<number, number>();
-              const monthlyValues = MONTHS_SHORT.map((_, i) => {
-                const v = monthlyMap.get(i + 1);
-                return v != null ? v : null;
-              });
+          // Helper: bangun map achievement per indicator untuk satu sumber data
+          const buildPeriodMap = (source: any[]) => {
+            const m = new Map<number, Map<number, number>>();
+            for (const ach of source) {
+              if (ach.month < startM || ach.month > endM) continue;
+              if (!m.has(ach.indicatorId)) m.set(ach.indicatorId, new Map());
+              m.get(ach.indicatorId)!.set(ach.month, Number(ach.value));
+            }
+            return m;
+          };
+
+          const achieveInPeriod = buildPeriodMap(achievements.value);
+          const achieveInPeriodPrev = buildPeriodMap(
+            achievementsPrevYear.value,
+          );
+          const achieveInPeriodPrev2 = buildPeriodMap(
+            achievementsPrevYear2.value,
+          );
+
+          // Filter items berdasarkan grup yang dipilih
+          const items = selectedGroup.value
+            ? (dashboard.items as any[]).filter(
+                (item) =>
+                  groupByIndicator.get(item.indicatorId) ===
+                  selectedGroup.value,
+              )
+            : (dashboard.items as any[]);
+
+          // Hitung nilai N, N-1, N-2 per indikator
+          const barData = items
+            .map((item: any) => {
+              const criteria = item.criteria || "last_month";
+              const get = (m: Map<number, Map<number, number>>) =>
+                computeIndicatorTotal(
+                  m.get(item.indicatorId) ?? new Map(),
+                  criteria,
+                );
               return {
                 name:
                   item.label || item.indicatorName || `#${item.indicatorId}`,
-                type: "bar",
-                data: monthlyValues,
-                barMaxWidth: 18,
-                emphasis: { itemStyle: { shadowBlur: 4 } },
+                value: get(achieveInPeriod),
+                prevValue: get(achieveInPeriodPrev),
+                prevValue2: get(achieveInPeriodPrev2),
               };
-            });
+            })
+            .filter((d) => d.value > 0 || d.prevValue > 0 || d.prevValue2 > 0)
+            .sort((a, b) => b.value - a.value);
 
-            const hasData = series.some((s) => s.data.some((v) => v != null));
+          const hasData = barData.length > 0;
+          const hasPrev1Data = barData.some((d) => d.prevValue > 0);
+          const hasPrev2Data = barData.some((d) => d.prevValue2 > 0);
+          const hasAnyPrev = hasPrev1Data || hasPrev2Data;
 
-            const chartOption =
-              series.length > 0
-                ? {
-                    tooltip: {
-                      trigger: "axis",
-                      axisPointer: { type: "shadow" as const },
-                      formatter: (params: any[]) => {
-                        const month = MONTHS_LONG[params[0].dataIndex];
-                        let html = `<b>${month} ${selectedYear.value}</b><br/>`;
-                        for (const p of params) {
-                          const val =
-                            p.value != null
-                              ? Number(p.value).toLocaleString("id-ID")
-                              : "\u2014";
-                          html += `${p.marker} ${p.seriesName}: <b>${val}</b><br/>`;
-                        }
-                        return html;
-                      },
-                    },
-                    legend: {
-                      type: "scroll",
-                      bottom: 0,
-                      itemWidth: 12,
-                      textStyle: { fontSize: 10 },
-                    },
-                    grid: {
-                      top: 8,
-                      bottom: 48,
-                      left: 8,
-                      right: 8,
-                      containLabel: true,
-                    },
-                    xAxis: {
-                      type: "category",
-                      data: MONTHS_SHORT,
-                      axisLabel: { fontSize: 10 },
-                      axisTick: { show: false },
-                      axisLine: { lineStyle: { color: "#e0e0e0" } },
-                    },
-                    yAxis: {
-                      type: "value",
-                      axisLabel: {
-                        fontSize: 9,
-                        formatter: (v: number) => fmtNum(v),
-                      },
-                      splitLine: {
-                        lineStyle: { type: "dashed", color: "#f0f0f0" },
-                      },
-                    },
-                    series,
-                  }
-                : null;
+          const names = barData.map((d) => d.name);
+          const values = barData.map((d) => d.value);
+          const prevValues = barData.map((d) => d.prevValue);
+          const prevValues2 = barData.map((d) => d.prevValue2);
 
-            return {
-              id: dashboard.id,
-              name: dashboard.name,
-              year: dashboard.year,
-              hasData,
-              itemCount: items.length,
-              chartOption,
-            };
-          })
-          // Saat filter grup aktif, sembunyikan chart yang tidak punya item
-          .filter((chart) => !selectedGroup.value || chart.itemCount > 0)
-      );
+          const prevLabelFmt = (p: any) =>
+            p.value > 0 ? fmtNum(Number(p.value)) : "";
+
+          const chartOption = hasData
+            ? {
+                tooltip: {
+                  trigger: "axis",
+                  axisPointer: { type: "shadow" as const },
+                  formatter: (params: any[]) => {
+                    const name = params[0].name;
+                    let tip = `<b>${name}</b><br/>`;
+                    for (const p of params) {
+                      if (!p.value && p.value !== 0) continue;
+                      tip += `${p.marker} ${p.seriesName}: <b>${fmtNum(Number(p.value))}</b><br/>`;
+                    }
+                    return tip;
+                  },
+                },
+                legend: hasAnyPrev
+                  ? {
+                      data: [
+                        String(selectedYear.value),
+                        String(prevYear),
+                        String(prevYear2),
+                      ],
+                      selected: {
+                        [String(prevYear)]: false,
+                        [String(prevYear2)]: false,
+                      },
+                      top: 0,
+                      itemWidth: 10,
+                      textStyle: { fontSize: 9 },
+                    }
+                  : undefined,
+                grid: {
+                  top: hasAnyPrev ? 24 : 8,
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  containLabel: true,
+                },
+                xAxis: {
+                  type: "category",
+                  data: names,
+                  axisLabel: {
+                    fontSize: 10,
+                    interval: 0,
+                    overflow: "truncate",
+                    width: 80,
+                  },
+                  axisTick: { show: false },
+                  axisLine: { lineStyle: { color: "#e0e0e0" } },
+                },
+                yAxis: {
+                  type: "value",
+                  axisLabel: {
+                    fontSize: 9,
+                    formatter: (v: number) => fmtNum(v),
+                  },
+                  splitLine: {
+                    lineStyle: { type: "dashed", color: "#f0f0f0" },
+                  },
+                },
+                series: [
+                  {
+                    name: String(selectedYear.value),
+                    type: "bar",
+                    data: values,
+                    barMaxWidth: hasAnyPrev ? 14 : 40,
+                    label: {
+                      show: true,
+                      position: "top",
+                      fontSize: 10,
+                      formatter: (p: any) => fmtNum(Number(p.value)),
+                    },
+                    itemStyle: { borderRadius: [4, 4, 0, 0] },
+                  },
+                  ...(hasPrev1Data
+                    ? [
+                        {
+                          name: String(prevYear),
+                          type: "bar",
+                          data: prevValues,
+                          barMaxWidth: 14,
+                          label: {
+                            show: true,
+                            position: "top",
+                            fontSize: 10,
+                            formatter: prevLabelFmt,
+                          },
+                          itemStyle: {
+                            color: "#b0c4d8",
+                            borderRadius: [4, 4, 0, 0],
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(hasPrev2Data
+                    ? [
+                        {
+                          name: String(prevYear2),
+                          type: "bar",
+                          data: prevValues2,
+                          barMaxWidth: 14,
+                          label: {
+                            show: true,
+                            position: "top",
+                            fontSize: 10,
+                            formatter: prevLabelFmt,
+                          },
+                          itemStyle: {
+                            color: "#ccd9e4",
+                            borderRadius: [4, 4, 0, 0],
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              }
+            : null;
+
+          return {
+            id: dashboard.id,
+            name: dashboard.name,
+            year: dashboard.year,
+            startMonth: dashboard.startMonth as number | null,
+            endMonth: dashboard.endMonth as number | null,
+            hasData,
+            itemCount: items.length,
+            dataCount: barData.length,
+            chartOption,
+          };
+        })
+        .filter((chart) => !selectedGroup.value || chart.itemCount > 0);
     });
 
     // ── Chart 2: Capaian Tahunan per Indikator (Horizontal Bar) ───
@@ -736,24 +949,22 @@ export default defineComponent({
     const matrixColumns = computed(() => {
       const base: any[] = [
         {
-          title: "Grup",
-          key: "group",
-          width: 130,
+          title: "Indikator",
+          key: "name",
           fixed: "left",
+          width: 120,
           ellipsis: { tooltip: true },
         },
         {
-          title: "Indikator",
-          key: "name",
-          width: 170,
-          fixed: "left",
+          title: "Grup",
+          key: "group",
+          width: 130,
           ellipsis: { tooltip: true },
         },
         {
           title: "Kriteria",
           key: "criteria",
           width: 100,
-          fixed: "left",
           render: (row: any) =>
             row.criteria === "accumulation" ? "📊 Akm" : "📅 Bln",
         },
@@ -779,7 +990,6 @@ export default defineComponent({
         title: "Capaian",
         key: "total",
         width: 100,
-        fixed: "right" as const,
         align: "right" as const,
         render: (row: any) => {
           const v = row.total;

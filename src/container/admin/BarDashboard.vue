@@ -4,7 +4,9 @@
 
         <!-- Filter & Tambah -->
         <n-space class="mb-3" align="center" wrap>
-            <n-button type="primary" @click="openModal()">+ Tambah Diagram</n-button>
+            <n-button type="primary" @click="openModal()"
+                >+ Tambah Diagram</n-button
+            >
             <n-select
                 v-model:value="filterYear"
                 :options="yearOptions"
@@ -50,14 +52,36 @@
                     style="width: 100%"
                 />
             </n-form-item>
+            <n-form-item label="Bulan Mulai">
+                <n-select
+                    v-model:value="formData.startMonth"
+                    :options="monthOptions"
+                    placeholder="Pilih bulan mulai"
+                    clearable
+                    style="width: 100%"
+                />
+            </n-form-item>
+            <n-form-item label="Bulan Akhir">
+                <n-select
+                    v-model:value="formData.endMonth"
+                    :options="monthOptions"
+                    placeholder="Pilih bulan akhir"
+                    clearable
+                    style="width: 100%"
+                />
+            </n-form-item>
             <n-form-item label="Status">
                 <n-switch v-model:value="formData.isActive" />
             </n-form-item>
         </n-form>
         <n-space justify="end">
             <n-button @click="isModalOpen = false">Batal</n-button>
-            <n-button type="primary" :loading="modalLoading" @click="submitModal">
-                {{ isEditMode ? 'Simpan Perubahan' : 'Tambah' }}
+            <n-button
+                type="primary"
+                :loading="modalLoading"
+                @click="submitModal"
+            >
+                {{ isEditMode ? "Simpan Perubahan" : "Tambah" }}
             </n-button>
         </n-space>
     </n-modal>
@@ -71,7 +95,15 @@
     >
         <n-spin :show="itemsModalLoading">
             <!-- Tambah indikator -->
-            <n-card size="small" class="mb-3" :bordered="false" style="background: var(--n-color-modal, #f9f9f9); border-radius: 8px">
+            <n-card
+                size="small"
+                class="mb-3"
+                :bordered="false"
+                style="
+                    background: var(--n-color-modal, #f9f9f9);
+                    border-radius: 8px;
+                "
+            >
                 <n-space align="center" wrap>
                     <n-select
                         v-model:value="selectedIndicatorId"
@@ -105,22 +137,28 @@
                         <span class="order-num">{{ idx + 1 }}</span>
                         <div class="order-btns">
                             <n-button
-                                text size="tiny"
+                                text
+                                size="tiny"
                                 :disabled="idx === 0"
                                 @click="moveItem(idx, -1)"
                                 title="Naik"
-                            >▲</n-button>
+                                >▲</n-button
+                            >
                             <n-button
-                                text size="tiny"
+                                text
+                                size="tiny"
                                 :disabled="idx === editItems.length - 1"
                                 @click="moveItem(idx, 1)"
                                 title="Turun"
-                            >▼</n-button>
+                                >▼</n-button
+                            >
                         </div>
                     </div>
 
                     <!-- Nama indikator -->
-                    <div class="item-name">{{ getIndicatorName(item.indicatorId) }}</div>
+                    <div class="item-name">
+                        {{ getIndicatorName(item.indicatorId) }}
+                    </div>
 
                     <!-- Label kustom (opsional) -->
                     <n-input
@@ -137,7 +175,8 @@
                         text
                         @click="removeItemFromList(idx)"
                         title="Hapus"
-                    >✕</n-button>
+                        >✕</n-button
+                    >
                 </div>
             </div>
         </n-spin>
@@ -165,8 +204,12 @@
 <script src="./BarDashboard.ts" />
 
 <style scoped>
-.mb-3 { margin-bottom: 12px; }
-.mt-3 { margin-top: 12px; }
+.mb-3 {
+    margin-bottom: 12px;
+}
+.mt-3 {
+    margin-top: 12px;
+}
 
 .items-list {
     display: flex;

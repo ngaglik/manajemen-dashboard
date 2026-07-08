@@ -321,18 +321,50 @@
                                 <span class="pie-card-title">{{
                                     chart.name
                                 }}</span>
-                                <n-tag
-                                    v-if="chart.year"
-                                    size="tiny"
-                                    type="info"
-                                    >{{ chart.year }}</n-tag
+                                <div
+                                    style="
+                                        display: flex;
+                                        gap: 4px;
+                                        align-items: center;
+                                        flex-shrink: 0;
+                                    "
                                 >
+                                    <n-tag
+                                        v-if="chart.year"
+                                        size="tiny"
+                                        type="info"
+                                        >{{ chart.year }}</n-tag
+                                    >
+                                    <n-tag
+                                        v-if="
+                                            chart.startMonth || chart.endMonth
+                                        "
+                                        size="tiny"
+                                        type="success"
+                                    >
+                                        {{
+                                            MONTHS_SHORT[
+                                                (chart.startMonth ?? 1) - 1
+                                            ]
+                                        }}
+                                        –
+                                        {{
+                                            MONTHS_SHORT[
+                                                (chart.endMonth ?? 12) - 1
+                                            ]
+                                        }}
+                                    </n-tag>
+                                </div>
                             </div>
                         </template>
 
                         <v-chart
                             v-if="chart.hasData"
                             class="bar-dash-chart"
+                            :style="{
+                                height:
+                                    Math.max(200, chart.dataCount * 48) + 'px',
+                            }"
                             :option="chart.chartOption"
                             :autoresize="true"
                         />
@@ -358,21 +390,24 @@
                     </div>
                 </template>
 
-                <v-chart
-                    v-if="hasAnnualData"
-                    class="annual-chart"
-                    :style="{
-                        height:
-                            Math.max(200, achievementMatrix.length * 36) + 'px',
-                    }"
-                    :option="annualBarChartOption"
-                    :autoresize="true"
-                />
-                <n-empty
-                    v-else
-                    description="Belum ada data capaian untuk tahun ini"
-                    style="padding: 48px 0"
-                />
+                <div class="annual-chart-wrap">
+                    <v-chart
+                        v-if="hasAnnualData"
+                        class="annual-chart"
+                        :style="{
+                            height:
+                                Math.max(200, achievementMatrix.length * 36) +
+                                'px',
+                        }"
+                        :option="annualBarChartOption"
+                        :autoresize="true"
+                    />
+                    <n-empty
+                        v-else
+                        description="Belum ada data capaian untuk tahun ini"
+                        style="padding: 48px 0"
+                    />
+                </div>
             </n-card>
 
             <!-- ── Tabel Matrix Indikator × Bulan ─────────────────────── -->
@@ -388,20 +423,22 @@
                     </div>
                 </template>
 
-                <n-data-table
-                    v-if="achievementMatrix.length > 0"
-                    :columns="matrixColumns"
-                    :data="achievementMatrix"
-                    size="small"
-                    :scroll-x="1400"
-                    :max-height="400"
-                    :striped="true"
-                />
-                <n-empty
-                    v-else
-                    description="Belum ada data capaian untuk tahun ini"
-                    style="padding: 32px 0"
-                />
+                <div class="matrix-scroll-wrap">
+                    <n-data-table
+                        v-if="achievementMatrix.length > 0"
+                        :columns="matrixColumns"
+                        :data="achievementMatrix"
+                        size="small"
+                        :scroll-x="1400"
+                        :max-height="400"
+                        :striped="true"
+                    />
+                    <n-empty
+                        v-else
+                        description="Belum ada data capaian untuk tahun ini"
+                        style="padding: 32px 0"
+                    />
+                </div>
             </n-card>
         </n-spin>
     </div>
@@ -572,7 +609,6 @@
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07) !important;
     width: 100%;
     box-sizing: border-box;
-    overflow: hidden;
 }
 
 .db-section-header {
@@ -786,7 +822,20 @@
 }
 
 /* ── Annual chart ───────────────────────────────────────────── */
+.matrix-scroll-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.annual-chart-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 .annual-chart {
+    min-width: 420px;
     width: 100%;
     min-height: 200px;
 }
@@ -809,7 +858,6 @@
 }
 
 .bar-dash-chart {
-    height: 260px;
     width: 100%;
 }
 </style>
