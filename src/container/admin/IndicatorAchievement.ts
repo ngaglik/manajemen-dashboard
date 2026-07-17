@@ -58,6 +58,7 @@ export default defineComponent({
     const periodLoading = ref(false);
     const saveLoading = ref(false);
     const periodItems = ref<any[]>([]);
+    const savingItemId = ref<number | null>(null);
     const periodSummary = ref({ total: 0, filled: 0, empty: 0 });
 
     const yearOptions = computed(() => {
@@ -122,6 +123,54 @@ export default defineComponent({
       }
     };
 
+    // ── Auto-save single item (debounced) ───────────────────────────────
+    let saveTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+
+    const saveSingleItem = async (row: any) => {
+      if (row.inputValue === null || row.inputValue === undefined || row.inputValue === "") {
+        return;
+      }
+
+      if (saveTimers[row.indicatorId]) {
+        clearTimeout(saveTimers[row.indicatorId]);
+      }
+
+      saveTimers[row.indicatorId] = setTimeout(async () => {
+        savingItemId.value = row.indicatorId;
+        try {
+          const res = (await apiFetch(
+            `${Config.UrlBackend}/api/fin/indicator-achievements/batch`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                year: selectedYear.value,
+                month: selectedMonth.value,
+                items: [{
+                  indicatorId: row.indicatorId,
+                  value: Number(row.inputValue),
+                  note: row.inputNote || null,
+                }],
+                updatedBy: auth?.username ?? "system",
+              }),
+            },
+          )) as Response;
+
+          if (!res || !res.ok) {
+            const err = res ? await res.json() : null;
+            throw new Error(err?.message || "Gagal menyimpan");
+          }
+
+          await fetchPeriodData();
+        } catch (err) {
+          message.error((err as Error).message || "Gagal menyimpan");
+        } finally {
+          savingItemId.value = null;
+          delete saveTimers[row.indicatorId];
+        }
+      }, 600);
+    };
+
     const saveBatch = async () => {
       const items = periodItems.value
         .filter(
@@ -174,7 +223,7 @@ export default defineComponent({
       }
     };
 
-    // Kolom tabel input periode — value & note langsung edit inline
+    // Kolom tabel input periode — value & note langsung auto-save
     const periodColumns = [
       {
         title: "No",
@@ -196,8 +245,10 @@ export default defineComponent({
             placeholder: "0",
             showButton: false,
             style: { width: "100%" },
+            disabled: savingItemId.value === row.indicatorId,
             "onUpdate:value": (val: number | null) => {
               row.inputValue = val;
+              saveSingleItem(row);
             },
           });
         },
@@ -218,8 +269,11 @@ export default defineComponent({
       {
         title: "Status",
         key: "achievementId",
-        width: 100,
+        width: 110,
         render(row: any) {
+          if (savingItemId.value === row.indicatorId) {
+            return "⏳ Menyimpan...";
+          }
           return row.achievementId ? "✅ Terisi" : "⬜ Kosong";
         },
       },
@@ -449,7 +503,6 @@ export default defineComponent({
       filteredPeriodSummary,
       periodColumns,
       fetchPeriodData,
-      saveBatch,
       // history
       historyData,
       historyLoading,

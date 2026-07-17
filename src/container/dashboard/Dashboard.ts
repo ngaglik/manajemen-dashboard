@@ -244,12 +244,7 @@ export default defineComponent({
     );
 
     // ── Helpers ───────────────────────────────────────────────────
-    const fmtNum = (v: number) =>
-      v >= 1_000_000
-        ? (v / 1_000_000).toFixed(2) + "M"
-        : v >= 1_000
-          ? (v / 1_000).toFixed(1) + "K"
-          : v.toLocaleString("id-ID");
+    const fmtNum = (v: number) => v.toLocaleString("id-ID");
 
     // ── Chart 1: KPI Cards — satu grafik per indikator ────────────
     const kpiCards = computed(() =>
@@ -854,12 +849,7 @@ export default defineComponent({
         xAxis: {
           type: "value",
           axisLabel: {
-            formatter: (v: number) =>
-              v >= 1_000_000
-                ? (v / 1_000_000).toFixed(1) + "M"
-                : v >= 1_000
-                  ? (v / 1_000).toFixed(0) + "K"
-                  : String(v),
+            formatter: (v: number) => v.toLocaleString("id-ID"),
           },
           splitLine: { lineStyle: { type: "dashed" } },
         },
@@ -884,7 +874,7 @@ export default defineComponent({
               fontSize: 10,
               formatter: (p: any) =>
                 Number(p.value) >= 1_000
-                  ? (Number(p.value) / 1_000).toFixed(0) + "K"
+                  ? Number(p.value).toLocaleString("id-ID")
                   : String(p.value),
             },
             itemStyle: { borderRadius: [0, 4, 4, 0] },
@@ -978,11 +968,7 @@ export default defineComponent({
         render: (row: any) => {
           const v = row.months[i];
           if (v == null) return "—";
-          return v >= 1_000_000
-            ? (v / 1_000_000).toFixed(2) + "M"
-            : v >= 1_000
-              ? (v / 1_000).toFixed(1) + "K"
-              : v.toLocaleString("id-ID");
+          return v == null ? "—" : Number(v).toLocaleString("id-ID");
         },
       }));
 
@@ -994,12 +980,7 @@ export default defineComponent({
         render: (row: any) => {
           const v = row.total;
           const label = row.criteria === "accumulation" ? " (Akm)" : " (Σ)";
-          const fmt =
-            v >= 1_000_000
-              ? (v / 1_000_000).toFixed(2) + "M"
-              : v >= 1_000
-                ? (v / 1_000).toFixed(1) + "K"
-                : v.toLocaleString("id-ID");
+          const fmt = Number(v).toLocaleString("id-ID");
           return fmt + label;
         },
       };

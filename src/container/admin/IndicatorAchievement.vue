@@ -91,26 +91,10 @@
                         size="small"
                     />
                     <n-empty
-                        v-else-if="!periodLoading"
-                        description="Pilih periode dan klik Muat Data"
-                    />
-                </n-spin>
-
-                <!-- Tombol simpan -->
-                <n-space
-                    v-if="periodItems.length > 0"
-                    class="mt-3"
-                    justify="end"
-                >
-                    <n-button
-                        type="primary"
-                        size="large"
-                        :loading="saveLoading"
-                        @click="saveBatch"
-                    >
-                        Simpan Semua
-                    </n-button>
-                </n-space>
+                            v-else-if="!periodLoading"
+                            description="Pilih periode dan klik Muat Data"
+                        />
+                    </n-spin>
             </n-tab-pane>
 
             <!-- ══════════════════════════════════════════════════════
