@@ -284,12 +284,11 @@ export default defineComponent({
             ? Math.round((currentVal / target) * 100)
             : null;
 
-        // Warna bar tahun ini
+        // Warna bar tahun ini — seragam sesuai legend
         const barColor = (val: number | null) => {
           if (val == null) return "#e2e2e2";
-          if (target == null) return "#7aadd4";
-          return val >= target ? "#6db992" : "#d98a8a";
-        };
+          return "#cddc29";
+                  };
 
         const chartOption = {
           tooltip: {
@@ -356,6 +355,7 @@ export default defineComponent({
             {
               name: String(selectedYear.value),
               type: "bar",
+              color: "#cddc29",
               data: monthlyValues.map((v) => ({
                 value: v,
                 itemStyle: { color: barColor(v), borderRadius: [3, 3, 0, 0] },
@@ -368,7 +368,7 @@ export default defineComponent({
                       symbol: "none",
                       lineStyle: {
                         type: "dashed",
-                        color: "#c8a060",
+                        color: "#fdd5b1",
                         width: 1.5,
                         opacity: 0.75,
                       },
@@ -379,7 +379,7 @@ export default defineComponent({
                             formatter: `Target: ${fmtNum(target)}`,
                             position: "insideEndTop",
                             fontSize: 10,
-                            color: "#c8a060",
+                            color: "#fdd5b1",
                           },
                         },
                       ],
@@ -391,6 +391,7 @@ export default defineComponent({
                   {
                     name: String(prevYear),
                     type: "bar",
+                    color: "#b0c4d8",
                     data: prevYearValues.map((v) => ({
                       value: v,
                       itemStyle: {
@@ -407,6 +408,7 @@ export default defineComponent({
                   {
                     name: String(prevYear2),
                     type: "bar",
+                    color: "#ccd9e4",
                     data: prevYear2Values.map((v) => ({
                       value: v,
                       itemStyle: {
@@ -786,51 +788,112 @@ export default defineComponent({
 
     // ── Chart 2: Capaian Tahunan per Indikator (Horizontal Bar) ───
     const annualBarChartOption = computed(() => {
-      // Kumpulkan data per indikator
-      const indicatorMap = new Map<
-        number,
-        {
-          name: string;
-          group: string;
-          criteria: string;
-          months: Map<number, number>;
-        }
-      >();
+      const prevYear = selectedYear.value - 1;
+      const prevYear2 = selectedYear.value - 2;
 
+      // Bangun Map per tahun: indicatorId → { month → value }
+      type IndicatorInfo = {
+        name: string;
+        group: string;
+        criteria: string;
+      };
+
+      const indicatorInfo = new Map<number, IndicatorInfo>();
+      const currentMap = new Map</* id */ number, Map</* month */ number, number>>();
+      const prevMap = new Map</* id */ number, Map</* month */ number, number>>();
+      const prev2Map = new Map</* id */ number, Map</* month */ number, number>>();
+
+      const ensure = (
+        id: number,
+        name: string,
+        group: string,
+        criteria: string,
+      ) => {
+        if (!indicatorInfo.has(id))
+          indicatorInfo.set(id, { name, group, criteria });
+        if (!currentMap.has(id)) currentMap.set(id, new Map());
+        if (!prevMap.has(id)) prevMap.set(id, new Map());
+        if (!prev2Map.has(id)) prev2Map.set(id, new Map());
+      };
+
+      // Current year — hanya sampai bulan berjalan (month-to-date)
       for (const ach of achievements.value) {
-        if (!indicatorMap.has(ach.indicatorId)) {
-          indicatorMap.set(ach.indicatorId, {
-            name: ach.indicatorName || `#${ach.indicatorId}`,
-            group: ach.groupName || "",
-            criteria: ach.criteria || "last_month",
-            months: new Map(),
-          });
-        }
-        indicatorMap
-          .get(ach.indicatorId)!
-          .months.set(ach.month, Number(ach.value));
+        if (ach.month > currentMonth) continue;
+        ensure(
+          ach.indicatorId,
+          ach.indicatorName || `#${ach.indicatorId}`,
+          ach.groupName || "",
+          ach.criteria || "last_month",
+        );
+        currentMap.get(ach.indicatorId)!.set(ach.month, Number(ach.value));
       }
 
-      // Terapkan filter grup sebelum menghitung total
-      const filteredEntries = selectedGroup.value
-        ? Array.from(indicatorMap.entries()).filter(
-            ([, ind]) => ind.group === selectedGroup.value,
-          )
-        : Array.from(indicatorMap.entries());
+      // Previous year (Y-1)
+      for (const ach of achievementsPrevYear.value) {
+        ensure(
+          ach.indicatorId,
+          ach.indicatorName || `#${ach.indicatorId}`,
+          ach.groupName || "",
+          ach.criteria || "last_month",
+        );
+        prevMap.get(ach.indicatorId)!.set(ach.month, Number(ach.value));
+      }
 
-      if (!filteredEntries.length) return null;
+      // Previous year 2 (Y-2)
+      for (const ach of achievementsPrevYear2.value) {
+        ensure(
+          ach.indicatorId,
+          ach.indicatorName || `#${ach.indicatorId}`,
+          ach.groupName || "",
+          ach.criteria || "last_month",
+        );
+        prev2Map.get(ach.indicatorId)!.set(ach.month, Number(ach.value));
+      }
 
-      // Hitung total sesuai kriteria
-      const withTotal = filteredEntries.map(([, ind]) => ({
-        ...ind,
-        total: computeIndicatorTotal(ind.months, ind.criteria),
-      }));
+      // Terapkan filter grup
+      const filteredIds = selectedGroup.value
+        ? Array.from(indicatorInfo.entries())
+            .filter(([, info]) => info.group === selectedGroup.value)
+            .map(([id]) => id)
+        : Array.from(indicatorInfo.keys());
 
-      const sorted = withTotal.sort((a, b) => b.total - a.total);
-      const names = sorted.map((x) => x.name);
-      const values = sorted.map((x) => x.total);
-      const criteriaLabels = sorted.map((x) =>
-        x.criteria === "accumulation" ? "Akm" : "Bln",
+      if (!filteredIds.length) return null;
+
+      // Hitung total tiap indikator untuk 3 periode
+      const rows = filteredIds.map((id) => {
+        const info = indicatorInfo.get(id)!;
+        const currentTotal = computeIndicatorTotal(
+          currentMap.get(id) || new Map(),
+          info.criteria,
+        );
+        const prevTotal = computeIndicatorTotal(
+          prevMap.get(id) || new Map(),
+          info.criteria,
+        );
+        const prev2Total = computeIndicatorTotal(
+          prev2Map.get(id) || new Map(),
+          info.criteria,
+        );
+        return { name: info.name, criteria: info.criteria, currentTotal, prevTotal, prev2Total };
+      });
+
+      // Urut berdasarkan total tahun ini menurun
+      const sorted = rows.sort((a, b) => b.currentTotal - a.currentTotal);
+      const names = sorted.map((r) => r.name);
+      const currentValues = sorted.map((r) => r.currentTotal);
+      const prevValues = sorted.map((r) => r.prevTotal);
+      const prev2Values = sorted.map((r) => r.prev2Total);
+
+      const hasPrev1 = prevValues.some((v) => v > 0);
+      const hasPrev2 = prev2Values.some((v) => v > 0);
+      const hasAnyPrev = hasPrev1 || hasPrev2;
+
+      const currentLabel = String(selectedYear.value);
+      const prevLabel = String(prevYear);
+      const prev2Label = String(prevYear2);
+
+      const criteriaLabels = sorted.map((r) =>
+        r.criteria === "accumulation" ? "Akm" : "Bln",
       );
 
       return {
@@ -838,47 +901,117 @@ export default defineComponent({
           trigger: "axis",
           axisPointer: { type: "shadow" },
           formatter: (params: any[]) => {
-            const p = params[0];
-            const idx = p.dataIndex;
+            const first = params[0];
+            const idx = first.dataIndex;
             const kr =
               criteriaLabels[idx] === "Akm" ? "Akumulasi" : "Bulan Terakhir";
-            return `${p.name}<br/>${p.marker} Capaian: <b>${Number(p.value).toLocaleString("id-ID")}</b><br/>Kriteria: ${kr}`;
+            let tip = `<b>${first.name}</b><br/>`;
+            for (const p of params) {
+              if (p.value == null || p.value === 0) continue;
+              tip += `${p.marker} ${p.seriesName}: <b>${Number(p.value).toLocaleString("id-ID")}</b><br/>`;
+            }
+            tip += `Kriteria: ${kr}`;
+            return tip;
           },
         },
-        grid: { top: 10, bottom: 10, left: 16, right: 60, containLabel: true },
+        legend: hasAnyPrev
+          ? {
+              data: [currentLabel, prevLabel, prev2Label],
+              selected: {
+                [prevLabel]: false,
+                [prev2Label]: false,
+              },
+              top: -2,
+              itemWidth: 12,
+              textStyle: { fontSize: 10 },
+            }
+          : undefined,
+        grid: {
+          top: hasAnyPrev ? 28 : 10,
+          bottom: 60,
+          left: 16,
+          right: 50,
+          containLabel: true,
+        },
         xAxis: {
-          type: "value",
-          axisLabel: {
-            formatter: (v: number) => v.toLocaleString("id-ID"),
-          },
-          splitLine: { lineStyle: { type: "dashed" } },
-        },
-        yAxis: {
           type: "category",
           data: names,
           axisLabel: {
-            width: 180,
+            rotate: 45,
+            fontSize: 10,
+            width: 80,
             overflow: "truncate",
-            fontSize: 11,
           },
+        },
+        yAxis: {
+          type: "value",
+          axisLabel: {
+            formatter: (v: number) => v.toLocaleString("id-ID"),
+            fontSize: 10,
+          },
+          splitLine: { lineStyle: { type: "dashed" } },
         },
         series: [
           {
-            name: "Total Capaian",
+            name: currentLabel,
             type: "bar",
-            data: values,
-            barMaxWidth: 28,
+            data: currentValues,
+            barMaxWidth: hasAnyPrev ? 14 : 28,
             label: {
               show: true,
-              position: "right",
+              position: "top",
               fontSize: 10,
               formatter: (p: any) =>
                 Number(p.value) >= 1_000
                   ? Number(p.value).toLocaleString("id-ID")
-                  : String(p.value),
+                  : String(p.value || ""),
             },
-            itemStyle: { borderRadius: [0, 4, 4, 0] },
+            itemStyle: { borderRadius: [4, 4, 0, 0], color: "#cddc29" },
           },
+          ...(hasPrev1
+            ? [
+                {
+                  name: prevLabel,
+                  type: "bar" as const,
+                  data: prevValues,
+                  barMaxWidth: 14,
+                  label: {
+                    show: true,
+                    position: "top",
+                    fontSize: 10,
+                    formatter: (p: any) =>
+                      Number(p.value) >= 1_000
+                        ? Number(p.value).toLocaleString("id-ID")
+                        : p.value > 0
+                          ? String(p.value)
+                          : "",
+                  },
+                  itemStyle: { borderRadius: [4, 4, 0, 0], color: "#91cc75" },
+                },
+              ]
+            : []),
+          ...(hasPrev2
+            ? [
+                {
+                  name: prev2Label,
+                  type: "bar" as const,
+                  data: prev2Values,
+                  barMaxWidth: 14,
+                  label: {
+                    show: true,
+                    position: "top",
+                    fontSize: 10,
+                    formatter: (p: any) =>
+                      Number(p.value) >= 1_000
+                        ? Number(p.value).toLocaleString("id-ID")
+                        : p.value > 0
+                          ? String(p.value)
+                          : "",
+                  },
+                  itemStyle: { borderRadius: [4, 4, 0, 0], color: "#fac858" },
+                },
+              ]
+            : []),
         ],
       };
     });

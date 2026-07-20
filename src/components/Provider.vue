@@ -32,8 +32,8 @@ import useConfig from "@/hooks/useConfig";
 
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: "#4fb233",
-    primaryColorHover: "#4fb233",
+    primaryColor: "#14b8a6",
+    primaryColorHover: "#14b8a6",
     fontSize: "16px",
     borderRadius: "16px",
   },

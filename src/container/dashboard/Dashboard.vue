@@ -101,7 +101,7 @@
             </div>
 
             <!-- ── KPI Cards : satu grafik per indikator ──────────────── -->
-            <div class="db-section-bare">
+            <div class="db-section-bare db-section-bare-tosca">
                 <div class="db-section-header mb-2">
                     <span class="db-section-title">
                         📉 KPI Capaian Bulanan — {{ selectedYear }}
@@ -382,10 +382,10 @@
                 <template #header>
                     <div class="db-section-header">
                         <span class="db-section-title">
-                            📊 Total Capaian per Indikator — {{ selectedYear }}
+                            📊 Total Capaian per Indikator
                         </span>
                         <n-tag type="default" size="small">
-                            {{ achievementMatrix.length }} indikator
+                            {{ selectedYear }} / {{ selectedYear - 1 }} / {{ selectedYear - 2 }}
                         </n-tag>
                     </div>
                 </template>
@@ -394,11 +394,7 @@
                     <v-chart
                         v-if="hasAnnualData"
                         class="annual-chart"
-                        :style="{
-                            height:
-                                Math.max(200, achievementMatrix.length * 36) +
-                                'px',
-                        }"
+                        style="height: 340px"
                         :option="annualBarChartOption"
                         :autoresize="true"
                     />
@@ -534,8 +530,8 @@
     border-left: 4px solid #2080f0;
 }
 .db-card-green {
-    background: linear-gradient(135deg, #e8f7ee 0%, #d0f0db 100%);
-    border-left: 4px solid #18a058;
+    background: linear-gradient(135deg, #e6fffa 0%, #c7f2e8 100%);
+    border-left: 4px solid #14b8a6;
 }
 .db-card-orange {
     background: linear-gradient(135deg, #fff4e6 0%, #ffe5c0 100%);
@@ -636,6 +632,11 @@
     min-width: 0;
 }
 
+.db-section-bare-tosca {
+    border-left: 4px solid #14b8a6;
+    padding-left: 14px;
+}
+
 .mb-2 {
     margin-bottom: 10px;
 }
@@ -663,7 +664,7 @@
 
 /* ── KPI Card ─────────────────────────────────────────────── */
 .kpi-card {
-    background: var(--n-color, #fff);
+    background: linear-gradient(135deg, #ffffff 0%, #14b8a6 100%);
     border: 1px solid var(--n-border-color, #e8e8e8);
     border-radius: 10px;
     padding: 12px 12px 8px;
@@ -752,8 +753,14 @@
     color: #b89050;
 }
 .kpi-rate-good {
-    color: #4aa878;
+    color: #14b8a6;
 }
+
+/* Progress bar sukses — tosca gradasi putih */
+.kpi-card :deep(.n-progress--success) [class*="fill"] {
+    background: linear-gradient(90deg, #ffffff 0%, #14b8a6 100%) !important;
+}
+
 .kpi-rate-warn {
     color: #c09040;
 }
@@ -859,5 +866,12 @@
 
 .bar-dash-chart {
     width: 100%;
+}
+</style>
+
+<style>
+/* Override Naive UI progress fill — tosca gradasi putih (non-scoped) */
+.kpi-card .n-progress--success [class*="fill"] {
+    background: linear-gradient(90deg, #ffffff 0%, #14b8a6 100%) !important;
 }
 </style>
