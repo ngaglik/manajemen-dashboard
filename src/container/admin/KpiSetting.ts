@@ -1,5 +1,5 @@
 import { defineComponent, ref, computed, h } from "vue";
-import { useMessage, NInputNumber, NInput, NSwitch, NTag } from "naive-ui";
+import { useMessage, NInputNumber, NInput, NSelect, NSwitch, NTag } from "naive-ui";
 import { Config } from "@/constant/config";
 import { apiFetch } from "@/services/apiClient";
 import { getAuthData } from "@/services/authService";
@@ -41,6 +41,18 @@ export default defineComponent({
     const settingItems = ref<any[]>([]);
     const filterGroupIdSetting = ref<number | null>(null);
 
+    // Penanda versi seleksi: di-increment saat status pilih berubah agar
+    // naive-ui me-render ulang sel tabel (disabled kolom ikut ter-update).
+    const selectionVersion = ref(0);
+
+    // Konjungsi / arah penilaian capaian terhadap target.
+    const conjunctionOptions = [
+      { label: "Tercapai jika ≥ target (di atas)", value: ">=" },
+      { label: "Tercapai jika ≤ target (di bawah)", value: "<=" },
+    ];
+    const conjunctionLabel = (v: string | null | undefined) =>
+      v === "<=" ? "≤ Target" : "≥ Target";
+
     const yearOptions = computed(() => {
       const years = [];
       for (let y = currentYear + 3; y >= currentYear - 5; y--) {
@@ -49,10 +61,17 @@ export default defineComponent({
       return years;
     });
 
+    // Cek keanggotaan grup: utamakan daftar groupIds (many-to-many),
+    // fallback ke groupId utama untuk data lama.
+    const belongsToGroup = (item: any, groupId: number) =>
+      item.groupIds?.length
+        ? item.groupIds.includes(groupId)
+        : item.groupId === groupId;
+
     const filteredSettingItems = computed(() => {
       if (!filterGroupIdSetting.value) return settingItems.value;
-      return settingItems.value.filter(
-        (x) => x.groupId === filterGroupIdSetting.value,
+      return settingItems.value.filter((x) =>
+        belongsToGroup(x, filterGroupIdSetting.value as number),
       );
     });
 
@@ -81,6 +100,7 @@ export default defineComponent({
           ...item,
           inputIsSelected: item.isSelected ?? false,
           inputTargetValue: item.targetValue ?? null,
+          inputConjunction: item.conjunction ?? ">=",
           inputNote: item.note ?? "",
         }));
       } catch (err) {
@@ -91,15 +111,35 @@ export default defineComponent({
     };
 
     const selectAll = () => {
-      filteredSettingItems.value.forEach((item) => {
-        item.inputIsSelected = true;
-      });
+      const visible = new Set(
+        filteredSettingItems.value.map((x) => x.indicatorId),
+      );
+      // Buat objek baris baru agar tabel me-render ulang (status disabled kolom lain).
+      settingItems.value = settingItems.value.map((x) =>
+        visible.has(x.indicatorId) ? { ...x, inputIsSelected: true } : x,
+      );
+      selectionVersion.value++;
     };
 
     const deselectAll = () => {
-      filteredSettingItems.value.forEach((item) => {
-        item.inputIsSelected = false;
-      });
+      const visible = new Set(
+        filteredSettingItems.value.map((x) => x.indicatorId),
+      );
+      settingItems.value = settingItems.value.map((x) =>
+        visible.has(x.indicatorId) ? { ...x, inputIsSelected: false } : x,
+      );
+      selectionVersion.value++;
+    };
+
+    // Ganti objek baris (bukan mutasi in-place) supaya naive-ui me-render ulang
+    // sel-sel lain, sehingga `disabled` pada Konjungsi/Target/Catatan ikut berubah.
+    const setRowSelected = (row: any, val: boolean) => {
+      settingItems.value = settingItems.value.map((x) =>
+        x.indicatorId === row.indicatorId
+          ? { ...x, inputIsSelected: val }
+          : x,
+      );
+      selectionVersion.value++;
     };
 
     const saveBatch = async () => {
@@ -111,6 +151,7 @@ export default defineComponent({
           x.inputTargetValue !== null && x.inputTargetValue !== ""
             ? Number(x.inputTargetValue)
             : null,
+        conjunction: x.inputConjunction || ">=",
         note: x.inputNote || null,
       }));
 
@@ -146,7 +187,11 @@ export default defineComponent({
       }
     };
 
-    const settingColumns = [
+    const settingColumns = computed<any[]>(() => {
+      // Bergantung pada selectionVersion supaya kolom dibuat ulang dan sel
+      // dirender ulang ketika status "Dipilih sebagai KPI" berubah.
+      selectionVersion.value;
+      return [
       {
         title: "No",
         key: "no",
@@ -155,7 +200,19 @@ export default defineComponent({
           return index + 1;
         },
       },
-      { title: "Grup", key: "groupName", width: 170 },
+      {
+        title: "Grup",
+        key: "groupName",
+        width: 170,
+        render(row: any) {
+          const names = row.groupNames?.length
+            ? row.groupNames
+            : row.groupName
+              ? [row.groupName]
+              : [];
+          return names.join(", ") || "—";
+        },
+      },
       { title: "Indikator", key: "indicatorName" },
       {
         title: "Dipilih sebagai KPI",
@@ -167,7 +224,23 @@ export default defineComponent({
             checkedValue: true,
             uncheckedValue: false,
             "onUpdate:value": (val: boolean) => {
-              row.inputIsSelected = val;
+              setRowSelected(row, val);
+            },
+          });
+        },
+      },
+      {
+        title: "Konjungsi",
+        key: "inputConjunction",
+        width: 210,
+        render(row: any) {
+          return h(NSelect, {
+            value: row.inputConjunction,
+            options: conjunctionOptions,
+            disabled: !row.inputIsSelected,
+            consistentMenuWidth: false,
+            "onUpdate:value": (val: string) => {
+              row.inputConjunction = val;
             },
           });
         },
@@ -218,7 +291,8 @@ export default defineComponent({
           );
         },
       },
-    ];
+      ];
+    });
 
     // ══════════════════════════════════════════════════════════════════
     // TAB RIWAYAT KPI
@@ -234,8 +308,8 @@ export default defineComponent({
 
     const filteredHistoryData = computed(() => {
       if (!filterHistoryGroupId.value) return historyData.value;
-      return (historyData.value as any[]).filter(
-        (x: any) => x.groupId === filterHistoryGroupId.value,
+      return (historyData.value as any[]).filter((x: any) =>
+        belongsToGroup(x, filterHistoryGroupId.value as number),
       );
     });
 
@@ -283,7 +357,19 @@ export default defineComponent({
         key: "year",
         width: 80,
       },
-      { title: "Grup", key: "groupName", width: 160 },
+      {
+        title: "Grup",
+        key: "groupName",
+        width: 160,
+        render(row: any) {
+          const names = row.groupNames?.length
+            ? row.groupNames
+            : row.groupName
+              ? [row.groupName]
+              : [];
+          return names.join(", ") || "—";
+        },
+      },
       { title: "Indikator", key: "indicatorName" },
       {
         title: "KPI",
@@ -295,6 +381,14 @@ export default defineComponent({
             { type: row.isSelected ? "success" : "default", size: "small" },
             { default: () => (row.isSelected ? "✅ Terpilih" : "⬜ Tidak") },
           );
+        },
+      },
+      {
+        title: "Konjungsi",
+        key: "conjunction",
+        width: 110,
+        render(row: any) {
+          return conjunctionLabel(row.conjunction);
         },
       },
       {

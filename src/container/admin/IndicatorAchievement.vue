@@ -24,6 +24,15 @@
                             style="width: 140px"
                         />
 
+                        <span class="label-text">Unit Kerja</span>
+                        <n-select
+                            v-model:value="filterOrgIdInput"
+                            :options="organizationIdOptions"
+                            placeholder="Semua Unit Kerja"
+                            clearable
+                            style="width: 200px"
+                        />
+
                         <n-button
                             type="primary"
                             :loading="periodLoading"
@@ -46,7 +55,7 @@
                         :options="groupIndicatorOptions"
                         placeholder="Semua Grup"
                         clearable
-                        style="width: 220px"
+                        style="width: 320px"
                     />
                 </n-space>
 
@@ -88,6 +97,7 @@
                         :columns="periodColumns"
                         :data="filteredPeriodItems"
                         :max-height="440"
+                        :scroll-x="1860"
                         size="small"
                     />
                     <n-empty
@@ -122,7 +132,7 @@
                         :options="groupIndicatorOptions"
                         placeholder="Semua Grup"
                         clearable
-                        style="width: 200px"
+                        style="width: 320px"
                     />
                     <n-button type="primary" @click="handleHistoryFilter"
                         >Filter</n-button
@@ -134,6 +144,7 @@
                     :data="filteredHistoryData"
                     :loading="historyLoading"
                     :max-height="420"
+                    :scroll-x="1500"
                     size="small"
                 />
                 <n-pagination

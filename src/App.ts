@@ -152,6 +152,22 @@ export default defineComponent({
 
       let menu: MenuItem[] = JSON.parse(JSON.stringify(LAYOUT_ITEMS));
 
+      const tags = String(auth?.employee?.tags ?? "")
+        .split(",")
+        .map((t) => t.trim().toUpperCase());
+      const isVerifikator = tags.includes("VERIFIKATORDASHBOARD");
+      const isAdmin = tags.includes("ADMINDASHBOARD");
+
+      // Hanya user dengan tag VERIFIKATORDASHBOARD yang boleh melihat menu Pengaturan
+      if (!isVerifikator) {
+        menu = removeNodeByKey(menu, "/master-data");
+      }
+
+      // Menu Capaian Indikator: hanya untuk VERIFIKATORDASHBOARD / ADMINDASHBOARD
+      if (!isVerifikator && !isAdmin) {
+        menu = removeNodeByKey(menu, "/indicator-achievement");
+      }
+
       return menu;
     };
 

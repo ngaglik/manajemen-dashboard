@@ -6,6 +6,23 @@
                 <n-button type="primary" @click="openAddModal" class="mb-4">
                     Add Data
                 </n-button>
+                <n-select
+                    v-model:value="filterOrganizationId"
+                    :options="organizationIdOptions"
+                    placeholder="Filter Unit Kerja"
+                    clearable
+                    style="width: 220px"
+                    @update:value="handleFilterOrganization"
+                />
+                <n-select
+                    v-model:value="filterGroupId"
+                    :options="groupIdOptions"
+                    :consistent-menu-width="false"
+                    placeholder="Filter Grup Indikator"
+                    clearable
+                    style="width: 320px"
+                    @update:value="handleFilterGroup"
+                />
                 <n-input-group>
                     <n-button type="primary"> Search </n-button>
                     <n-input
@@ -18,8 +35,9 @@
             </n-space>
             <n-data-table
                 :columns="columns"
-                :data="tableData"
+                :data="filteredTableData"
                 :max-height="300"
+                :scroll-x="1250"
             />
             <n-pagination
                 v-model:page="current"
@@ -45,11 +63,31 @@
             <n-form-item label="Name">
                 <n-input v-model:value="formData.name" />
             </n-form-item>
-            <n-form-item label="Group">
+            <n-form-item label="Group (bisa lebih dari satu)">
                 <n-select
-                    v-model:value="formData.groupId"
+                    v-model:value="formData.groupIds"
                     :options="groupIdOptions"
-                    placeholder="Pilih"
+                    multiple
+                    max-tag-count="responsive"
+                    placeholder="Pilih satu atau lebih grup"
+                />
+            </n-form-item>
+            <n-form-item label="Unit Kerja">
+                <n-select
+                    v-model:value="formData.organizationId"
+                    :options="organizationIdOptions"
+                    placeholder="Pilih unit kerja"
+                    clearable
+                    @update:value="handleOrganizationChange"
+                />
+            </n-form-item>
+            <n-form-item label="PIC">
+                <n-select
+                    v-model:value="formData.picId"
+                    :options="picOptions"
+                    :disabled="!formData.organizationId"
+                    placeholder="Pilih PIC (pegawai unit kerja)"
+                    filterable
                     clearable
                 />
             </n-form-item>
@@ -66,7 +104,10 @@
                     <b>Bulan Terakhir</b>: nilai diambil dari bulan yang dipilih
                     saja.<br />
                     <b>Akumulasi</b>: nilai dijumlahkan dari bulan pertama s/d
-                    bulan yang dipilih.
+                    bulan yang dipilih.<br />
+                    <b>Rata-rata</b>: nilai dijumlahkan dari bulan pertama s/d
+                    bulan yang dipilih, lalu dirata-rata (dibagi jumlah bulan
+                    yang ada datanya).
                 </n-text>
             </n-form-item>
             <n-form-item label="Status Active">

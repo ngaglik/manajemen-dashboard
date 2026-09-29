@@ -8,6 +8,30 @@ export const LAYOUT_ITEMS = [
     key: "/indicator-achievement",
   },
   {
+    label: "Rekomendasi Dewas",
+    key: "/dewas-recommendation",
+  },
+  {
+    label: "Bank Notulensi Rapat",
+    key: "/rapat-notulen",
+  },
+  {
+    label: "Bank Regulasi",
+    key: "/bank-regulasi",
+  },
+  {
+    label: "Bank Pedoman",
+    key: "/bank-pedoman",
+  },
+  {
+    label: "Bank Panduan",
+    key: "/bank-panduan",
+  },
+  {
+    label: "Bank SOP",
+    key: "/bank-sop",
+  },
+  {
     label: "Pengaturan",
     key: "/master-data",
     children: [

@@ -20,9 +20,15 @@
                     v-model:value="selectedGroup"
                     :options="groupOptions"
                     size="small"
-                    style="width: 160px"
+                    style="width: 320px"
                     placeholder="Semua Grup"
                     clearable
+                />
+                <n-select
+                    v-model:value="selectedVerification"
+                    :options="verificationOptions"
+                    size="small"
+                    style="width: 150px"
                 />
                 <n-button
                     size="small"
@@ -144,6 +150,7 @@
                         v-for="card in filteredKpiCards"
                         :key="card.indicatorId"
                         class="kpi-card"
+                        @click="openZoom('kpi', card)"
                     >
                         <!-- Card header -->
                         <div class="kpi-card-header">
@@ -157,8 +164,17 @@
                                 size="tiny"
                                 type="info"
                                 class="kpi-card-group"
+                                :title="
+                                    card.groupNames?.length
+                                        ? card.groupNames.join(', ')
+                                        : (card.groupName || '')
+                                "
                             >
-                                {{ card.groupName || "—" }}
+                                {{
+                                    card.groupNames?.length
+                                        ? card.groupNames.join(', ')
+                                        : card.groupName || '—'
+                                }}
                             </n-tag>
                         </div>
 
@@ -240,11 +256,15 @@
                         />
 
                         <!-- Chart -->
-                        <v-chart
+                        <lazy-chart
                             class="kpi-card-chart"
                             :option="card.chartOption"
-                            :autoresize="true"
                         />
+
+                        <!-- Petunjuk klik → perbesar -->
+                        <span class="zoom-hint" aria-hidden="true"
+                            >⤢ Perbesar</span
+                        >
                     </div>
                 </div>
             </div>
@@ -264,9 +284,10 @@
                     <n-card
                         v-for="pie in propPieCharts"
                         :key="pie.id"
-                        class="pie-card"
+                        :class="['pie-card', { 'is-zoomable': pie.hasData }]"
                         :bordered="true"
                         size="small"
+                        @click="pie.hasData && openZoom('pie', pie)"
                     >
                         <template #header>
                             <div class="pie-card-header">
@@ -282,17 +303,22 @@
                             </div>
                         </template>
 
-                        <v-chart
+                        <lazy-chart
                             v-if="pie.hasData"
                             class="pie-chart"
                             :option="pie.chartOption"
-                            :autoresize="true"
                         />
                         <n-empty
                             v-else
                             description="Belum ada data capaian"
                             style="padding: 32px 0"
                         />
+                        <span
+                            v-if="pie.hasData"
+                            class="zoom-hint"
+                            aria-hidden="true"
+                            >⤢ Perbesar</span
+                        >
                     </n-card>
                 </div>
             </div>
@@ -312,9 +338,13 @@
                     <n-card
                         v-for="chart in barDashboardCharts"
                         :key="chart.id"
-                        class="bar-dash-card"
+                        :class="[
+                            'bar-dash-card',
+                            { 'is-zoomable': chart.hasData },
+                        ]"
                         :bordered="true"
                         size="small"
+                        @click="chart.hasData && openZoom('bar', chart)"
                     >
                         <template #header>
                             <div class="pie-card-header">
@@ -358,7 +388,7 @@
                             </div>
                         </template>
 
-                        <v-chart
+                        <lazy-chart
                             v-if="chart.hasData"
                             class="bar-dash-chart"
                             :style="{
@@ -366,19 +396,28 @@
                                     Math.max(200, chart.dataCount * 48) + 'px',
                             }"
                             :option="chart.chartOption"
-                            :autoresize="true"
                         />
                         <n-empty
                             v-else
                             description="Belum ada data capaian"
                             style="padding: 32px 0"
                         />
+                        <span
+                            v-if="chart.hasData"
+                            class="zoom-hint"
+                            aria-hidden="true"
+                            >⤢ Perbesar</span
+                        >
                     </n-card>
                 </div>
             </div>
 
             <!-- ── Chart 2 : Capaian Tahunan per Indikator ──────────────── -->
-            <n-card class="db-section" :bordered="false">
+            <n-card
+                :class="['db-section', { 'annual-card-zoom': hasAnnualData }]"
+                :bordered="false"
+                @click="hasAnnualData && openZoom('annual', null)"
+            >
                 <template #header>
                     <div class="db-section-header">
                         <span class="db-section-title">
@@ -391,12 +430,11 @@
                 </template>
 
                 <div class="annual-chart-wrap">
-                    <v-chart
+                    <lazy-chart
                         v-if="hasAnnualData"
                         class="annual-chart"
                         style="height: 340px"
                         :option="annualBarChartOption"
-                        :autoresize="true"
                     />
                     <n-empty
                         v-else
@@ -404,6 +442,12 @@
                         style="padding: 48px 0"
                     />
                 </div>
+                <span
+                    v-if="hasAnnualData"
+                    class="zoom-hint"
+                    aria-hidden="true"
+                    >⤢ Perbesar</span
+                >
             </n-card>
 
             <!-- ── Tabel Matrix Indikator × Bulan ─────────────────────── -->
@@ -437,6 +481,206 @@
                 </div>
             </n-card>
         </n-spin>
+
+        <!-- ── Modal : perbesar kartu grafik ─────────────────────────── -->
+        <n-modal
+            v-model:show="zoomVisible"
+            preset="card"
+            :title="zoomTitle"
+            :style="{ width: 'min(1080px, 96vw)' }"
+        >
+            <div v-if="zoomItem" class="zoom-body">
+                <!-- Info tambahan (tahun / periode / grup) -->
+                <div
+                    v-if="zoomItem.kind !== 'annual'"
+                    class="zoom-meta"
+                >
+                    <n-tag
+                        v-if="zoomItem.year"
+                        type="info"
+                        size="small"
+                        >Tahun {{ zoomItem.year }}</n-tag
+                    >
+                    <n-tag
+                        v-if="
+                            zoomItem.kind === 'bar' &&
+                            (zoomItem.startMonth || zoomItem.endMonth)
+                        "
+                        type="success"
+                        size="small"
+                    >
+                        {{
+                            MONTHS_SHORT[(zoomItem.startMonth ?? 1) - 1]
+                        }}
+                        –
+                        {{
+                            MONTHS_SHORT[(zoomItem.endMonth ?? 12) - 1]
+                        }}
+                    </n-tag>
+                    <n-tag
+                        v-if="
+                            zoomItem.kind === 'kpi' &&
+                            zoomItem.groupNames &&
+                            zoomItem.groupNames.length
+                        "
+                        type="info"
+                        size="small"
+                    >
+                        {{ zoomItem.groupNames.join(', ') }}
+                    </n-tag>
+                    <n-tag
+                        v-for="(pic, i) in zoomPicNames"
+                        :key="`pic-${i}`"
+                        type="warning"
+                        size="small"
+                    >
+                        👤 PIC: {{ pic }}
+                    </n-tag>
+                </div>
+
+                <!-- Ringkasan statistik KPI -->
+                <div
+                    v-if="zoomItem.kind === 'kpi'"
+                    class="kpi-card-stats zoom-stats"
+                >
+                    <div class="kpi-stat">
+                        <span class="kpi-stat-label">Bulan ini</span>
+                        <span class="kpi-stat-value">
+                            {{
+                                zoomItem.currentVal != null
+                                    ? zoomItem.currentVal.toLocaleString(
+                                          'id-ID',
+                                      )
+                                    : '—'
+                            }}
+                        </span>
+                    </div>
+                    <div class="kpi-stat">
+                        <span class="kpi-stat-label">Konjungsi</span>
+                        <span class="kpi-stat-value kpi-conjunction">
+                            {{ zoomItem.conjunctionLabel }}
+                        </span>
+                    </div>
+                    <div class="kpi-stat">
+                        <span class="kpi-stat-label">Target</span>
+                        <span class="kpi-stat-value kpi-target">
+                            {{
+                                zoomItem.target != null
+                                    ? zoomItem.target.toLocaleString('id-ID')
+                                    : '—'
+                            }}
+                        </span>
+                    </div>
+                    <div class="kpi-stat">
+                        <span class="kpi-stat-label">Capaian</span>
+                        <span
+                            class="kpi-stat-value"
+                            :class="{
+                                'kpi-rate-good':
+                                    zoomItem.achieveRate != null &&
+                                    zoomItem.achieveRate >= 100,
+                                'kpi-rate-warn':
+                                    zoomItem.achieveRate != null &&
+                                    zoomItem.achieveRate >= 70 &&
+                                    zoomItem.achieveRate < 100,
+                                'kpi-rate-bad':
+                                    zoomItem.achieveRate != null &&
+                                    zoomItem.achieveRate < 70,
+                            }"
+                        >
+                            {{
+                                zoomItem.achieveRate != null
+                                    ? zoomItem.achieveRate + '%'
+                                    : '—'
+                            }}
+                        </span>
+                    </div>
+                    <div class="kpi-stat">
+                        <span class="kpi-stat-label">Terisi</span>
+                        <span class="kpi-stat-value"
+                            >{{ zoomItem.filledCount }}/12</span
+                        >
+                    </div>
+                </div>
+
+                <n-progress
+                    v-if="
+                        zoomItem.kind === 'kpi' && zoomItem.achieveRate != null
+                    "
+                    type="line"
+                    :percentage="Math.min(zoomItem.achieveRate, 100)"
+                    :height="6"
+                    :border-radius="3"
+                    :fill-border-radius="3"
+                    :show-indicator="false"
+                    :status="
+                        zoomItem.achieveRate >= 100
+                            ? 'success'
+                            : zoomItem.achieveRate >= 70
+                              ? 'warning'
+                              : 'error'
+                    "
+                    class="zoom-progress"
+                />
+
+                <!-- Grafik ukuran besar -->
+                <v-chart
+                    class="zoom-chart"
+                    :option="zoomItem.option"
+                    :autoresize="true"
+                    :style="{ height: zoomItem.height + 'px' }"
+                />
+
+                <!-- Daftar file evaluasi terkait -->
+                <div class="zoom-files">
+                    <div class="zoom-files-title">
+                        📑 File Evaluasi
+                        <span class="zoom-files-count">
+                            {{ zoomEvaluationFiles.length }}
+                        </span>
+                    </div>
+                    <div
+                        v-if="zoomEvaluationFiles.length > 0"
+                        class="zoom-files-list"
+                    >
+                        <div
+                            v-for="f in zoomEvaluationFiles"
+                            :key="f.achievementId"
+                            class="zoom-file-item"
+                        >
+                            <span class="zoom-file-period">
+                                <template v-if="f.showIndicator"
+                                    >{{ f.indicatorName }} ·
+                                </template>
+                                {{ f.monthLabel }}
+                            </span>
+                            <n-button
+                                size="tiny"
+                                type="info"
+                                quaternary
+                                :title="
+                                    'Diunggah oleh ' +
+                                    (f.uploadedBy || '-') +
+                                    (f.uploadedAt
+                                        ? ' · ' +
+                                          new Date(
+                                              f.uploadedAt,
+                                          ).toLocaleString('id-ID')
+                                        : '')
+                                "
+                                @click="downloadEvaluation(f)"
+                            >
+                                ⬇ {{ f.fileName }}
+                            </n-button>
+                        </div>
+                    </div>
+                    <div v-else class="zoom-files-empty">
+                        Belum ada file evaluasi untuk tahun {{ selectedYear }}.
+                        Unggah melalui menu <b>Capaian Indikator</b>.
+                    </div>
+                </div>
+            </div>
+        </n-modal>
     </div>
 </template>
 
@@ -705,7 +949,7 @@
 .kpi-card-group {
     flex-shrink: 0;
     font-size: 10px;
-    max-width: 90px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -866,6 +1110,149 @@
 
 .bar-dash-chart {
     width: 100%;
+}
+
+/* ── Klik kartu grafik → perbesar (modal) ─────────────────── */
+.kpi-card {
+    position: relative;
+}
+
+.kpi-card,
+.pie-card.is-zoomable,
+.bar-dash-card.is-zoomable,
+.annual-card-zoom {
+    cursor: pointer;
+}
+
+.pie-card,
+.bar-dash-card,
+.annual-card-zoom {
+    position: relative;
+}
+
+.zoom-hint {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #0f766e;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(20, 184, 166, 0.35);
+    border-radius: 999px;
+    padding: 2px 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    white-space: nowrap;
+}
+
+.kpi-card:hover .zoom-hint,
+.pie-card.is-zoomable:hover .zoom-hint,
+.bar-dash-card.is-zoomable:hover .zoom-hint,
+.annual-card-zoom:hover .zoom-hint {
+    opacity: 1;
+}
+
+/* ── Modal perbesar grafik ────────────────────────────────── */
+.zoom-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.zoom-stats {
+    margin-bottom: 10px;
+    /* 5 kolom: Bulan ini · Konjungsi · Target · Capaian · Terisi */
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* Mobile: 3 kolom agar tetap rapi (Bulan ini · Konjungsi · Target,
+   lalu Capaian · Terisi di baris kedua). */
+@media (max-width: 560px) {
+    .zoom-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.zoom-progress {
+    margin: 0 0 10px;
+}
+
+.zoom-body {
+    max-height: calc(100vh - 220px);
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.zoom-chart {
+    width: 100%;
+}
+
+/* ── Daftar file evaluasi pada modal zoom ─────────────────── */
+.zoom-files {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--n-border-color, #eee);
+}
+
+.zoom-files-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.zoom-files-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: rgba(20, 184, 166, 0.15);
+    color: #0f766e;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.zoom-files-empty {
+    font-size: 12px;
+    color: var(--n-text-color-3, #999);
+}
+
+.zoom-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.zoom-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    min-width: 0;
+}
+
+.zoom-file-period {
+    color: var(--n-text-color-3, #666);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 </style>
 

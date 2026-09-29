@@ -21,9 +21,10 @@
                         <n-select
                             v-model:value="filterGroupIdSetting"
                             :options="groupOptions"
+                            :consistent-menu-width="false"
                             placeholder="Semua Grup"
                             clearable
-                            style="width: 210px"
+                            style="width: 320px"
                         />
 
                         <n-button
@@ -84,7 +85,9 @@
                         v-if="filteredSettingItems.length > 0"
                         :columns="settingColumns"
                         :data="filteredSettingItems"
+                        :row-key="(row) => row.indicatorId"
                         :max-height="440"
+                        :scroll-x="1450"
                         size="small"
                     />
                     <n-empty
@@ -133,9 +136,10 @@
                     <n-select
                         v-model:value="filterHistoryGroupId"
                         :options="groupOptions"
+                        :consistent-menu-width="false"
                         placeholder="Semua Grup"
                         clearable
-                        style="width: 200px"
+                        style="width: 320px"
                     />
                     <n-button type="primary" @click="handleHistoryFilter">
                         Filter
@@ -147,6 +151,7 @@
                     :data="filteredHistoryData"
                     :loading="historyLoading"
                     :max-height="420"
+                    :scroll-x="1450"
                     size="small"
                 />
                 <n-pagination

@@ -15,6 +15,9 @@
         <!-- ── HEADER ──────────────────────────────────────────────── -->
         <header class="app-header">
             <div class="header-left">
+                <!-- Logo (Didepan/Diatas secara urutan tata letak) -->
+                <img src="/assets/logo-rspaw.png" alt="App Logo" class="app-logo" />
+
                 <!-- Burger Button -->
                 <button
                     class="burger-btn"
@@ -27,13 +30,13 @@
                     <span></span>
                 </button>
 
-                <span class="app-title">Manajemen Dashboard</span>
+                <!-- Title -->
+                <div class="brand-container">
+                    <span class="app-title">Dashboard Manajemen</span>
+                </div>
             </div>
 
             <div class="header-right">
-                <n-button text size="small" @click="changeTheme">
-                    {{ theme === null ? "Dark" : "Light" }}
-                </n-button>
                 <ProfileBar @logout="handleLogout" />
             </div>
         </header>
@@ -103,6 +106,18 @@
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+.brand-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.app-logo {
+    height: 60px; /* Disesuaikan agar proporsional dengan tinggi header 52px */
+    width: auto;
+    object-fit: contain;
 }
 
 .header-right {
@@ -244,6 +259,10 @@
 
 /* ── Mobile ────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+    .app-logo {
+        height: 36px; /* perkecil logo di layar mobile */
+    }
+
     .app-content {
         padding: 10px;
     }

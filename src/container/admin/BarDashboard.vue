@@ -20,6 +20,7 @@
             :data="tableData"
             :loading="loading"
             :max-height="380"
+            :scroll-x="900"
             size="small"
         />
         <n-pagination

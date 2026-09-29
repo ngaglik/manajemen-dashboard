@@ -1,14 +1,17 @@
 <template>
     <n-marquee>
         <n-h1 prefix="bar">
-            <n-text type="primary">Manajemen Dashboard</n-text>
+            <n-text type="primary">DashMan</n-text>
         </n-h1>
-        Management Information System
+        Dashboard Management System
     </n-marquee>
 
     <div class="login-wrapper">
-        <n-card title="Login" style="max-width: 400px; margin: 0 auto">
-            <small>Silakan menggunakan akun SiJEMPOL</small>
+        <n-card style="max-width: 400px; margin: 0 auto">
+            <div class="login-logo">
+                <img :src="logoRspaw" alt="Logo RSPAW" />
+            </div>
+            <small>Silakan login menggunakan akun SiJEMPOL</small>
             <n-divider />
 
             <n-form
@@ -55,6 +58,7 @@
 import { ref } from "vue";
 import { FormInst, useMessage } from "naive-ui";
 import { Config } from "@/constant/config";
+import logoRspaw from "../../assets/logo-rspaw.png";
 
 // =====================
 // Emits
@@ -148,5 +152,18 @@ const submit = async () => {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.login-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.login-logo img {
+    height: 72px;
+    width: auto;
+    object-fit: contain;
 }
 </style>
