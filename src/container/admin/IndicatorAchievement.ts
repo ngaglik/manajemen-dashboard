@@ -126,8 +126,11 @@ export default defineComponent({
 
     const monthOptions = MONTHS;
     const filterGroupIdInput = ref<number | null>(null);
+    // Default filter unit kerja mengikuti unit kerja pada sesi login
+    // (organization_id). Verifikator tetap dapat mengosongkan filter untuk
+    // melihat semua unit kerja.
     const filterOrgIdInput = ref<string | null>(
-      isVerifikator ? null : (auth?.employee?.organizationId ?? null),
+      auth?.employee?.organizationId ?? null,
     );
 
     // Helper: daftar id grup milik sebuah baris (dukung relasi many-to-many)
@@ -918,6 +921,10 @@ export default defineComponent({
     const filterYear = ref<number | null>(null);
     const filterMonth = ref<number | null>(null);
     const filterGroupIdHistory = ref<number | null>(null);
+    // Default filter unit kerja riwayat mengikuti sesi login.
+    const filterOrgIdHistory = ref<string | null>(
+      auth?.employee?.organizationId ?? null,
+    );
 
     const filteredHistoryData = computed(() => {
       if (!filterGroupIdHistory.value) return historyData.value;
@@ -932,6 +939,8 @@ export default defineComponent({
         let url = `${Config.UrlBackend}/api/fin/indicator-achievements?page=${page}&pageSize=${historyPageSize.value}`;
         if (filterYear.value) url += `&year=${filterYear.value}`;
         if (filterMonth.value) url += `&month=${filterMonth.value}`;
+        if (filterOrgIdHistory.value)
+          url += `&organizationId=${encodeURIComponent(filterOrgIdHistory.value)}`;
 
         const res = (await apiFetch(url, { method: "GET" })) as Response;
         if (!res || !res.ok) throw new Error("Gagal memuat riwayat");
@@ -1198,6 +1207,7 @@ export default defineComponent({
       filterYear,
       filterMonth,
       filterGroupIdHistory,
+      filterOrgIdHistory,
       filteredHistoryData,
       handleHistoryPageChange,
       handleHistoryFilter,

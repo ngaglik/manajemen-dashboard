@@ -128,6 +128,13 @@
                         style="width: 150px"
                     />
                     <n-select
+                        v-model:value="filterOrgIdHistory"
+                        :options="organizationIdOptions"
+                        placeholder="Semua Unit Kerja"
+                        clearable
+                        style="width: 200px"
+                    />
+                    <n-select
                         v-model:value="filterGroupIdHistory"
                         :options="groupIndicatorOptions"
                         placeholder="Semua Grup"

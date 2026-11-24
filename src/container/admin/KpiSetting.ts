@@ -40,6 +40,50 @@ export default defineComponent({
     const saveLoading = ref(false);
     const settingItems = ref<any[]>([]);
     const filterGroupIdSetting = ref<number | null>(null);
+    const searchSettingIndicator = ref("");
+
+    // ── Organization (Unit Kerja) options ──────────────────────────
+    const organizationOptions = ref<{ label: string; value: string }[]>([]);
+    const fetchOrganizationOptions = async () => {
+      try {
+        const res = (await apiFetch(
+          `${Config.UrlBackend}/api/option/organization`,
+          { method: "GET" },
+        )) as Response;
+        if (!res || !res.ok) return;
+        const result = await res.json();
+
+        let options = (result.data || result).map((item: any) => ({
+          label: item.name,
+          value: item.id,
+        }));
+
+        // Verifikator dashboard: semua unit kerja. Selain itu (termasuk
+        // admin): unit kerja user saja.
+        const userTags = String(auth?.employee?.tags ?? "")
+          .split(",")
+          .map((t) => t.trim().toUpperCase());
+        const isVerifikator = userTags.includes("VERIFIKATORDASHBOARD");
+        if (!isVerifikator) {
+          const userOrgId = auth?.employee?.organizationId as string | undefined;
+          if (userOrgId) {
+            options = options.filter((o: any) => o.value === userOrgId);
+            if (!options.some((o: any) => o.value === userOrgId)) {
+              options = [{ label: userOrgId, value: userOrgId }, ...options];
+            }
+          }
+        }
+
+        organizationOptions.value = options;
+      } catch {
+        // silent — pilihan tidak kritis
+      }
+    };
+
+    // Default filter unit kerja mengikuti unit kerja pada sesi login.
+    const filterOrganizationIdSetting = ref<string | null>(
+      (auth?.employee?.organizationId as string | undefined) ?? null,
+    );
 
     // Penanda versi seleksi: di-increment saat status pilih berubah agar
     // naive-ui me-render ulang sel tabel (disabled kolom ikut ter-update).
@@ -69,10 +113,30 @@ export default defineComponent({
         : item.groupId === groupId;
 
     const filteredSettingItems = computed(() => {
-      if (!filterGroupIdSetting.value) return settingItems.value;
-      return settingItems.value.filter((x) =>
-        belongsToGroup(x, filterGroupIdSetting.value as number),
-      );
+      const keyword = searchSettingIndicator.value.trim().toLowerCase();
+      return settingItems.value.filter((x) => {
+        if (
+          filterOrganizationIdSetting.value &&
+          x.organizationId !== filterOrganizationIdSetting.value
+        ) {
+          return false;
+        }
+        if (
+          filterGroupIdSetting.value &&
+          !belongsToGroup(x, filterGroupIdSetting.value)
+        ) {
+          return false;
+        }
+        if (
+          keyword &&
+          !String(x.indicatorName ?? "")
+            .toLowerCase()
+            .includes(keyword)
+        ) {
+          return false;
+        }
+        return true;
+      });
     });
 
     const settingSummary = computed(() => ({
@@ -415,6 +479,7 @@ export default defineComponent({
 
     // Init
     fetchGroupOptions();
+    fetchOrganizationOptions();
     fetchSettingData();
     fetchHistory(1);
 
@@ -428,6 +493,9 @@ export default defineComponent({
       saveLoading,
       settingItems,
       filterGroupIdSetting,
+      filterOrganizationIdSetting,
+      organizationOptions,
+      searchSettingIndicator,
       filteredSettingItems,
       settingSummary,
       settingColumns,

@@ -17,6 +17,15 @@
                             style="width: 110px"
                         />
 
+                        <span class="label-text">Unit Kerja</span>
+                        <n-select
+                            v-model:value="filterOrganizationIdSetting"
+                            :options="organizationOptions"
+                            placeholder="Semua Unit Kerja"
+                            clearable
+                            style="width: 220px"
+                        />
+
                         <span class="label-text">Filter Grup</span>
                         <n-select
                             v-model:value="filterGroupIdSetting"
@@ -25,6 +34,13 @@
                             placeholder="Semua Grup"
                             clearable
                             style="width: 320px"
+                        />
+
+                        <n-input
+                            v-model:value="searchSettingIndicator"
+                            placeholder="Cari nama indikator"
+                            clearable
+                            style="width: 240px"
                         />
 
                         <n-button

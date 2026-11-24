@@ -14,13 +14,16 @@ export default defineComponent({
       .split(",")
       .map((t) => t.trim().toUpperCase())
       .includes("VERIFIKATORDASHBOARD");
+    // Default filter unit kerja mengikuti unit kerja pada sesi login
+    // (organization_id). Pengguna tetap bisa mengosongkannya untuk melihat
+    // semua unit kerja (khusus verifikator).
     const filterOrganizationId = ref<string | null>(
-      isVerifikator ? null : (authLogin?.employee?.organizationId ?? null),
+      authLogin?.employee?.organizationId ?? null,
     );
     const filterGroupId = ref<number | null>(null);
     const tableData = ref([]);
     const current = ref(1);
-    const pageSize = ref(20);
+    const pageSize = ref(50);
     const total = ref(0);
     const loading = ref(false);
     let auth = getAuthData();
@@ -399,6 +402,7 @@ export default defineComponent({
           );
         },
       },
+      { title: "Indicator ID", key: "id", width: 120 },
       { title: "Name", key: "name" },
       {
         title: "Group(s)",

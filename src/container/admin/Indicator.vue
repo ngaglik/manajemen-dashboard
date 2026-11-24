@@ -36,8 +36,8 @@
             <n-data-table
                 :columns="columns"
                 :data="filteredTableData"
-                :max-height="300"
-                :scroll-x="1250"
+                :max-height="600"
+                :scroll-x="1380"
             />
             <n-pagination
                 v-model:page="current"
@@ -53,7 +53,7 @@
         :style="{ width: '600px' }"
     >
         <n-form :model="formData" label-width="100">
-            <n-form-item label="Id">
+            <n-form-item label="Indicator ID">
                 <n-input
                     v-model:value="formData.id"
                     placeholder="By system"
